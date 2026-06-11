@@ -1,16 +1,3 @@
-Tentu! Masalah teks yang terlalu kecil pada aplikasi Streamlit sering kali terjadi pada elemen seperti `st.caption`, label dari diagram, dan tag HTML kustom.
-
-Untuk memperbaiki hal tersebut tanpa merusak estetika *layout*, saya telah menambahkan beberapa perubahan berikut pada kode Anda:
-
-1. **Injeksi CSS Global:** Saya menambahkan sebuah blok kustom CSS di awal aplikasi untuk secara otomatis memperbesar ukuran font dari label widget (input form), tooltip, teks area, dan base font Streamlit ke **1.05rem - 1.1rem**.
-2. **Penggantian `st.caption`:** Saya membuat fungsi bantuan baru bernama `render_custom_caption` untuk menggantikan bawaan `st.caption` Streamlit yang sangat kecil. Font warnanya tetap estetik abu-abu mutiara (`#6c757d`), namun ukurannya diperbesar menjadi **1.05rem**.
-3. **Penyempurnaan `custom_progress_bar`:** Ukuran font pada fungsi bar pemenuhan gizi (HTML kustom) sudah ditingkatkan, begitu pula dengan tinggi visual dari bar (dari `14px` menjadi `16px`) agar lebih berimbang dengan font yang sudah diperbesar.
-4. **Peningkatan Keterbacaan Radar & Pie Chart Plotly:** Saya menambahkan parameter `tickfont=dict(size=14)` dan `textfont_size=14` agar label nutrisi pada diagram jauh lebih mudah dibaca.
-5. **Edukasi & Teks Debug OCR:** Tag `st.text` diganti menjadi `st.code` untuk visualisasi yang lebih luas, dan penjelasan edukasi diubah menggunakan list standar HTML dengan ukuran teks diperbesar.
-
-Berikut adalah sintaks lengkap aplikasi (`app.py`) yang sudah disempurnakan:
-
-```python
 from __future__ import annotations
 
 import io
