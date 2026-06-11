@@ -484,6 +484,7 @@ def custom_progress_bar(label, current_val, max_val, unit, color, percentage):
         color = "#E74C3C" 
         warning_text = "<span style='color:#E74C3C; font-weight:bold; font-size: 0.9em; margin-left: 5px;'>(Melebihi Batas!)</span>"
 
+    # Penulisan string dipadatkan untuk menghindari error markdown code block
     html_code = (
         f"<div style='margin-bottom: 24px; font-family: \"Inter\", \"Segoe UI\", sans-serif;'>"
         f"<div style='display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;'>"
@@ -1039,8 +1040,6 @@ elif app_mode == "Analisis Batch Excel":
                         fig_pie.update_layout(showlegend=False, margin=dict(t=20, b=20, l=20, r=20), height=400)
                         st.plotly_chart(fig_pie, use_container_width=True)
 
-                    # PERUBAHAN UTAMA: Membuang Plotly go.Bar, menggantinya dengan HTML Dinamis bergaya modern 
-                    # yang persis menyerupai desain visualisasi pada Pemenuhan Angka Kecukupan Gizi Harian.
                     with col_chart2:
                         st.markdown("**Bar Chart (Skor Risiko)**")
                         st.write("Menampilkan tingkat risiko dari tiap produk:")
@@ -1053,24 +1052,26 @@ elif app_mode == "Analisis Batch Excel":
                             "#6366F1", "#F43F5E", "#0EA5E9", "#10B981", "#8B5CF6"
                         ]
 
+                        # String HTML digabungkan tanpa indentasi agar tidak terbaca sebagai code block Markdown
                         html_bars = "<div style='margin-top: 16px;'>"
                         for i, (_, row_data) in enumerate(bar_data.iterrows()):
                             prod_name = row_data["Nama Produk"]
                             score = float(row_data["Skor Risiko Numerik"])
                             color = modern_palette[i % len(modern_palette)]
                             
-                            html_bars += f"""
-                            <div style='margin-bottom: 22px; font-family: "Inter", "Segoe UI", sans-serif;'>
-                                <div style='display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;'>
-                                    <span style='font-weight: 600; font-size: 14.5px; color: #0F172A;'>{prod_name}</span>
-                                    <span style='font-weight: 700; font-size: 14px; color: #334155;'>{score:.1f}%</span>
-                                </div>
-                                <div style='width: 100%; background-color: #E2E8F0; border-radius: 8px; height: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);'>
-                                    <div style='width: {min(score, 100)}%; background-color: {color}; height: 100%; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: width 0.8s ease-out;'></div>
-                                </div>
-                            </div>
-                            """
+                            html_bars += (
+                                f"<div style='margin-bottom: 22px; font-family: \"Inter\", \"Segoe UI\", sans-serif;'>"
+                                f"<div style='display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;'>"
+                                f"<span style='font-weight: 600; font-size: 14.5px; color: #0F172A;'>{prod_name}</span>"
+                                f"<span style='font-weight: 700; font-size: 14px; color: #334155;'>{score:.1f}%</span>"
+                                f"</div>"
+                                f"<div style='width: 100%; background-color: #E2E8F0; border-radius: 8px; height: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);'>"
+                                f"<div style='width: {min(score, 100)}%; background-color: {color}; height: 100%; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: width 0.8s ease-out;'></div>"
+                                f"</div>"
+                                f"</div>"
+                            )
                         html_bars += "</div>"
+                        
                         st.markdown(html_bars, unsafe_allow_html=True)
                         
                     st.caption("Pengguna lebih mudah memahami hasil.")
@@ -1082,8 +1083,20 @@ elif app_mode == "Analisis Batch Excel":
                 st.caption("Klik (*expand*) pada nama produk untuk melihat rincian pemenuhan batas harian.")
                 
                 for idx, row in valid_df.iterrows():
-                    with st.expander(f"📦 {row['Nama Produk']} — Klasifikasi: {row['Klasifikasi']} (Skor: {row['Skor Risiko Numerik']:.1f}%)"):
-                        render_health_metrics(row['nutrition_data'], row['takaran_saji'], current_threshold, show_header=False)
+                    prod_name = row.get("Nama Produk", "Produk")
+                    klasifikasi = row.get("Klasifikasi", "-")
+                    skor_num = row.get("Skor Risiko Numerik", 0)
+                    
+                    with st.expander(f"📦 {prod_name} — Klasifikasi: {klasifikasi} (Skor: {skor_num:.1f}%)"):
+                        # Proteksi KeyError: menggunakan dict get() untuk menghindari data session state lama yang usang
+                        if 'nutrition_data' in row and isinstance(row['nutrition_data'], dict):
+                            nut_data = row['nutrition_data']
+                        else:
+                            nut_data = {"gula": 0, "natrium": 0, "lemak_jenuh": 0}
+                            
+                        t_saji = row['takaran_saji'] if 'takaran_saji' in row else 100.0
+                        
+                        render_health_metrics(nut_data, t_saji, current_threshold, show_header=False)
                 
             except Exception as e:
                 st.error(f"Terjadi masalah saat merender visualisasi batch: {e}")
