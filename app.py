@@ -400,6 +400,7 @@ def render_recommendation_details(risk_info, recommendation_text, is_upf, upf_fl
         * 🔴 **Tinggi (70 - 100):** Sangat disarankan untuk dibatasi. Produk ini kemungkinan besar padat energi tanpa nutrisi bermanfaat (empty calories), tinggi gula/garam, atau merupakan produk *ultra-processed*.
         """)
 
+
 def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
     st.markdown("### 📊 Profil Gizi & Makronutrien Holistik")
     st.caption("Analisis mendalam mengenai sumber kalori dan dampak glikemik berdasarkan takaran saji.")
@@ -463,31 +464,30 @@ def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
 
 
 def custom_progress_bar(label, current_val, max_val, unit, color, percentage):
-    """Fungsi komponen HTML/CSS untuk progress bar kustom yang lebih modern."""
-    # Maksimal visual bar adalah 100% agar tidak keluar jalur layar
+    """Fungsi komponen HTML/CSS untuk progress bar kustom yang diratakan (flattened) untuk mencegah bug Markdown."""
     display_pct = min(percentage, 100)
     
     warning_text = ""
-    # Ubah warna jadi merah peringatan jika melampaui batas harian
     if percentage > 100:
         color = "#E74C3C" 
         warning_text = "<span style='color:#E74C3C; font-weight:bold; font-size: 0.9em; margin-left: 5px;'>(Melebihi Batas!)</span>"
 
-    html_code = f"""
-    <div style="margin-bottom: 24px; font-family: 'Inter', sans-serif;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px;">
-            <span style="font-weight: 600; font-size: 1.05em; color: #2C3E50;">{label}</span>
-            <span style="color: #34495E; font-size: 0.95em;">
-                <b>{current_val:.2f}</b> / {max_val:.2f} {unit} 
-                <span style="color: #7F8C8D; margin-left: 4px;">({percentage:.1f}%)</span>
-                {warning_text}
-            </span>
-        </div>
-        <div style="width: 100%; background-color: #E2E8F0; border-radius: 999px; height: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);">
-            <div style="width: {display_pct}%; background-color: {color}; height: 100%; border-radius: 999px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: width 0.8s ease-out;"></div>
-        </div>
-    </div>
-    """
+    # Digabungkan menjadi satu string tanpa spasi kosong/newline di awal baris agar tidak dibaca sebagai Markdown Code Block
+    html_code = (
+        f"<div style='margin-bottom: 24px; font-family: \"Inter\", sans-serif;'>"
+        f"<div style='display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px;'>"
+        f"<span style='font-weight: 600; font-size: 1.05em; color: #2C3E50;'>{label}</span>"
+        f"<span style='color: #34495E; font-size: 0.95em;'>"
+        f"<b>{current_val:.2f}</b> / {max_val:.2f} {unit} "
+        f"<span style='color: #7F8C8D; margin-left: 4px;'>({percentage:.1f}%)</span>"
+        f"{warning_text}"
+        f"</span>"
+        f"</div>"
+        f"<div style='width: 100%; background-color: #E2E8F0; border-radius: 999px; height: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);'>"
+        f"<div style='width: {display_pct}%; background-color: {color}; height: 100%; border-radius: 999px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: width 0.8s ease-out;'></div>"
+        f"</div>"
+        f"</div>"
+    )
     st.markdown(html_code, unsafe_allow_html=True)
 
 
@@ -504,8 +504,6 @@ def render_health_metrics(nutrition_data, takaran_saji, current_threshold):
     natrium_pct = (natrium / current_threshold["natrium"] * 100) if current_threshold["natrium"] else 0
     lemak_jenuh_pct = (lemak_jenuh / current_threshold["lemak_jenuh"] * 100) if current_threshold["lemak_jenuh"] else 0
 
-    # Menggunakan progress bar kustom dengan warna spesifik:
-    # Gula = Oranye, Natrium = Biru Laut, Lemak Jenuh = Ungu
     custom_progress_bar("Gula", gula, current_threshold["gula"], "g", "#F39C12", gula_pct)
     custom_progress_bar("Natrium", natrium, current_threshold["natrium"], "mg", "#3498DB", natrium_pct)
     custom_progress_bar("Lemak Jenuh", lemak_jenuh, current_threshold["lemak_jenuh"], "g", "#9B59B6", lemak_jenuh_pct)
@@ -638,6 +636,7 @@ def run_product_analysis(product_name, takaran_saji, nutrition_data, komposisi, 
     render_analysis_side(analysis_result, current_signature=analysis_result["input_signature"])
     render_analysis_bottom(analysis_result, current_threshold)
     return analysis_result
+
 
 def input_form(prefix, defaults):
     name_key = f"{prefix}_name"
