@@ -1004,7 +1004,7 @@ elif app_mode == "Analisis Batch Excel":
                 if not valid_df.empty:
                     classification_colors = {"Aman": "#2ECC71", "Sedang": "#F39C12", "Tinggi": "#E74C3C"}
 
-                    # === PIE CHART DITAMPILKAN DI ATAS, DIPERBAIKI TATA LETAKNYA ===
+                    # === PIE CHART DITAMPILKAN DI ATAS DENGAN LEBAR PENUH ===
                     st.markdown("#### Proporsi Klasifikasi Produk")
                     st.write("Menunjukkan persentase produk dalam kategori Aman, Sedang, dan Tinggi.")
                     
@@ -1022,7 +1022,7 @@ elif app_mode == "Analisis Batch Excel":
                         textfont_size=15
                     )])
                     
-                    # Memperbaiki legenda agar ada di bawah (horizontal) dan grafik terlihat balance
+                    # Layout dipusatkan dengan height proporsional agar tidak terlalu memakan tempat secara vertikal
                     fig_pie.update_layout(
                         showlegend=True, 
                         legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
@@ -1045,7 +1045,7 @@ elif app_mode == "Analisis Batch Excel":
                         "#6366F1", "#F43F5E", "#0EA5E9", "#10B981", "#8B5CF6"
                     ]
 
-                    # HTML disatukan seluruhnya ke dalam satu baris (inline) untuk 100% mencegah error Markdown code-block Streamlit
+                    # HTML dirender langsung menjadi string panjang
                     html_bars = "<div style='margin-top: 16px;'>"
                     for i, (_, row_data) in enumerate(bar_data.iterrows()):
                         prod_name = row_data["Nama Produk"]
