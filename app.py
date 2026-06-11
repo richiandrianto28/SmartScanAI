@@ -345,36 +345,16 @@ def render_xai_radar(xai_factors):
             r=norm_values + [norm_values[0]],
             theta=categories + [categories[0]],
             fill="toself",
-            fillcolor="rgba(79, 70, 229, 0.4)", # Warna indigo transparan modern
-            line=dict(color="#4F46E5", width=2.5), # Garis batas tegas
-            marker=dict(symbol="circle", size=8, color="#312E81"), # Titik marker yang jelas
             name="Kandungan Produk",
-            hoverinfo="r+theta"
         )
     )
     fig.update_layout(
-        polar=dict(
-            radialaxis=dict(
-                visible=True, 
-                range=[0, 100], 
-                showticklabels=False,
-                gridcolor="rgba(200, 200, 200, 0.3)", # Grid lebih halus
-                linecolor="rgba(200, 200, 200, 0.3)"
-            ),
-            angularaxis=dict(
-                gridcolor="rgba(200, 200, 200, 0.3)",
-                linecolor="rgba(200, 200, 200, 0.3)",
-            ),
-            bgcolor="rgba(0,0,0,0)" # Background transparan
-        ),
+        polar=dict(radialaxis=dict(visible=True, range=[0, 100], showticklabels=False)),
         showlegend=False,
-        height=350,
-        margin=dict(l=40, r=40, t=30, b=30),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
+        height=320,
+        margin=dict(l=20, r=20, t=20, b=20),
     )
-    # config displayModeBar=False untuk menyembunyikan toolbar plotly agar lebih estetik
-    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def render_recommendation_details(risk_info, recommendation_text, is_upf, upf_flags):
@@ -462,39 +442,9 @@ def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
         st.info("Data makronutrien kosong atau bernilai nol. Isi Lemak, Karbohidrat, dan Protein untuk melihat rasio kalori.")
 
 
-def custom_progress_bar(label, current_val, max_val, unit, color, percentage):
-    """Fungsi komponen HTML/CSS untuk progress bar kustom yang lebih modern."""
-    # Maksimal visual bar adalah 100% agar tidak keluar jalur layar
-    display_pct = min(percentage, 100)
-    
-    warning_text = ""
-    # Ubah warna jadi merah peringatan jika melampaui batas harian
-    if percentage > 100:
-        color = "#E74C3C" 
-        warning_text = "<span style='color:#E74C3C; font-weight:bold; font-size: 0.9em; margin-left: 5px;'>(Melebihi Batas!)</span>"
-
-    html_code = f"""
-    <div style="margin-bottom: 24px; font-family: 'Inter', sans-serif;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px;">
-            <span style="font-weight: 600; font-size: 1.05em; color: #2C3E50;">{label}</span>
-            <span style="color: #34495E; font-size: 0.95em;">
-                <b>{current_val:.2f}</b> / {max_val:.2f} {unit} 
-                <span style="color: #7F8C8D; margin-left: 4px;">({percentage:.1f}%)</span>
-                {warning_text}
-            </span>
-        </div>
-        <div style="width: 100%; background-color: #E2E8F0; border-radius: 999px; height: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);">
-            <div style="width: {display_pct}%; background-color: {color}; height: 100%; border-radius: 999px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: width 0.8s ease-out;"></div>
-        </div>
-    </div>
-    """
-    st.markdown(html_code, unsafe_allow_html=True)
-
-
 def render_health_metrics(nutrition_data, takaran_saji, current_threshold):
-    st.markdown("### 🎯 Pemenuhan Angka Kecukupan Gizi Harian")
-    st.caption("Berdasarkan profil pengguna dan batas ambang kesehatan medis Anda:")
-    st.write("")
+    st.markdown("### Pemenuhan Angka Kecukupan Gizi Harian")
+    st.write("Berdasarkan profil pengguna dan batas ambang kesehatan medis Anda:")
 
     gula = float(nutrition_data["gula"])
     natrium = float(nutrition_data["natrium"])
@@ -504,11 +454,14 @@ def render_health_metrics(nutrition_data, takaran_saji, current_threshold):
     natrium_pct = (natrium / current_threshold["natrium"] * 100) if current_threshold["natrium"] else 0
     lemak_jenuh_pct = (lemak_jenuh / current_threshold["lemak_jenuh"] * 100) if current_threshold["lemak_jenuh"] else 0
 
-    # Menggunakan progress bar kustom dengan warna spesifik:
-    # Gula = Oranye, Natrium = Biru Laut, Lemak Jenuh = Ungu
-    custom_progress_bar("Gula", gula, current_threshold["gula"], "g", "#F39C12", gula_pct)
-    custom_progress_bar("Natrium", natrium, current_threshold["natrium"], "mg", "#3498DB", natrium_pct)
-    custom_progress_bar("Lemak Jenuh", lemak_jenuh, current_threshold["lemak_jenuh"], "g", "#9B59B6", lemak_jenuh_pct)
+    st.write(f"**Gula:** {gula:.2f} g dari batas {current_threshold['gula']:.2f} g per hari. ({gula_pct:.2f}%)")
+    st.progress(min(int(round(gula_pct)), 100))
+    
+    st.write(f"**Natrium:** {natrium:.0f} mg dari batas {current_threshold['natrium']:.0f} mg per hari. ({natrium_pct:.2f}%)")
+    st.progress(min(int(round(natrium_pct)), 100))
+    
+    st.write(f"**Lemak jenuh:** {lemak_jenuh:.2f} g dari batas {current_threshold['lemak_jenuh']:.2f} g per hari. ({lemak_jenuh_pct:.2f}%)")
+    st.progress(min(int(round(lemak_jenuh_pct)), 100))
 
 
 def make_analysis_signature(product_name, takaran_saji, nutrition_data, komposisi):
