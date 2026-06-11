@@ -92,7 +92,6 @@ OCR_WIDGET_KEY_MAP = {
 LEGACY_OCR_WIDGET_KEYS = set(OCR_WIDGET_KEY_MAP.values())
 
 # Membersihkan key lama dari versi sebelumnya.
-# Ini mencegah warning Streamlit: widget dibuat dengan default value, tetapi juga diisi lewat Session State.
 for _legacy_key in list(LEGACY_OCR_WIDGET_KEYS):
     if _legacy_key in st.session_state:
         del st.session_state[_legacy_key]
@@ -104,12 +103,7 @@ def set_widget_default(key, value):
 
 
 def sync_ocr_value_to_form(key, value):
-    """Menyinkronkan hasil OCR hanya ke data sumber.
-
-    Catatan teknis: jangan menulis langsung ke key widget number_input atau text_area
-    setelah widget pernah dibuat, karena Streamlit dapat memunculkan error runtime.
-    Form dibuat ulang memakai versi key yang berubah setelah OCR berhasil.
-    """
+    """Menyinkronkan hasil OCR hanya ke data sumber."""
     if key not in st.session_state.ocr_data:
         return
 
@@ -344,33 +338,114 @@ def render_xai_radar(xai_factors):
     st.plotly_chart(fig, use_container_width=True)
 
 
-def render_health_metrics(nutrition_data, takaran_saji, current_threshold):
-    st.markdown("### Profil Gizi dan Makronutrien")
+def render_recommendation_details(risk_info, recommendation_text, is_upf, upf_flags):
+    st.markdown("### Rekomendasi")
+    
+    # Render kotak rekomendasi sesuai dengan style/tingkat risiko
+    if risk_info["style"] == "success":
+        st.info(f"{recommendation_text}")
+    elif risk_info["style"] == "warning":
+        st.warning(f"{recommendation_text}")
+    else:
+        st.error(f"{recommendation_text}")
 
-    energi = float(nutrition_data["energi"])
+    # Render peringatan bahan UPF jika ada
+    if is_upf:
+        st.error("Indikasi bahan ultra proses terdeteksi")
+        st.write(", ".join(upf_flags))
+        
+    st.markdown("---")
+    
+    # Penjelasan detail klasifikasi
+    with st.expander("ℹ️ Detail Penjelasan Klasifikasi Nutrisi", expanded=False):
+        st.markdown("""
+        * 🟢 **Aman (0 - 34.99):** Produk relatif aman dan sehat. Cocok untuk dikonsumsi dalam porsi wajar sebagai bagian dari asupan nutrisi harian Anda.
+        * 🟡 **Sedang (35 - 69.99):** Kandungan produk memiliki beberapa catatan (misal: kalori cukup padat atau ada gula tambahan). Boleh dikonsumsi sesekali, namun bukan untuk konsumsi utama harian yang berulang-ulang.
+        * 🔴 **Tinggi (70 - 100):** Sangat disarankan untuk dibatasi. Produk ini kemungkinan besar padat energi tanpa nutrisi bermanfaat (empty calories), tinggi gula/garam, atau merupakan produk *ultra-processed*.
+        """)
+
+def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
+    st.markdown("### 📊 Profil Gizi & Makronutrien Holistik")
+    st.caption("Analisis mendalam mengenai sumber kalori dan dampak glikemik berdasarkan takaran saji.")
+
+    energi = float(nutrition_data.get("energi", 0))
+    gula = float(nutrition_data.get("gula", 0))
+    karbohidrat = float(nutrition_data.get("karbohidrat", 0))
+    lemak_total = float(nutrition_data.get("lemak_total", 0))
+    protein = float(nutrition_data.get("protein", 0))
+
+    kepadatan = energi / takaran_saji if takaran_saji > 0 else 0
+    rasio_gula = (gula / karbohidrat * 100) if karbohidrat > 0 else 0
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("**Kepadatan Energi (kkal/gram)**")
+        st.markdown(f"## {kepadatan:.1f}")
+        if kepadatan > 4.0:
+            st.error("↑ 🔴 Sangat Tinggi (Padat Kalori)")
+            st.caption("Menunjukkan seberapa padat kalori dalam produk ini. Kepadatan tinggi memicu obesitas jika tidak dikontrol.")
+        elif kepadatan >= 1.5:
+            st.warning("— 🟡 Sedang")
+            st.caption("Kepadatan kalori moderat. Perhatikan porsi konsumsi Anda.")
+        else:
+            st.success("↓ 🟢 Rendah Kalori")
+            st.caption("Produk ini memiliki kepadatan energi yang rendah, baik untuk mengontrol asupan kalori.")
+
+    with col2:
+        st.markdown("**Rasio Gula dari Total Karbohidrat**")
+        st.markdown(f"## {rasio_gula:.1f}%")
+        if rasio_gula > 50:
+            st.error("↑ 🔴 Tinggi Gula Sederhana")
+            st.caption("Jika >50%, sebagian besar karbohidrat adalah gula sederhana yang bisa memicu lonjakan gula darah (*sugar spike*).")
+        elif rasio_gula >= 20:
+            st.warning("— 🟡 Sedang")
+            st.caption("Mengandung gula sederhana dalam jumlah sedang.")
+        else:
+            st.success("↓ 🟢 Rendah Gula")
+            st.caption("Sebagian besar karbohidrat berasal dari sumber kompleks yang lebih lama dicerna.")
+
+    st.write("")
+    st.markdown("**Distribusi Sumber Kalori (Macronutrient Split)**")
+
+    # Hitung estimasi kalori dari makronutrien (Rule of thumb: L=9, K=4, P=4)
+    kalori_lemak = lemak_total * 9
+    kalori_karbo = karbohidrat * 4
+    kalori_protein = protein * 4
+    total_kal_makro = kalori_lemak + kalori_karbo + kalori_protein
+
+    if total_kal_makro > 0:
+        labels = ['Lemak (9 kkal/g)', 'Karbohidrat (4 kkal/g)', 'Protein (4 kkal/g)']
+        values = [kalori_lemak, kalori_karbo, kalori_protein]
+        colors = ['#E74C3C', '#2ECC71', '#3498DB']  # Merah, Hijau, Biru
+
+        fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.5, marker=dict(colors=colors))])
+        fig.update_traces(textinfo='percent+label', textposition='inside')
+        fig.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10), height=350)
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("Data makronutrien kosong atau bernilai nol. Isi Lemak, Karbohidrat, dan Protein untuk melihat rasio kalori.")
+
+
+def render_health_metrics(nutrition_data, takaran_saji, current_threshold):
+    st.markdown("### Pemenuhan Angka Kecukupan Gizi Harian")
+    st.write("Berdasarkan profil pengguna dan batas ambang kesehatan medis Anda:")
+
     gula = float(nutrition_data["gula"])
     natrium = float(nutrition_data["natrium"])
     lemak_jenuh = float(nutrition_data["lemak_jenuh"])
-    karbohidrat = float(nutrition_data["karbohidrat"])
 
-    kepadatan = energi / takaran_saji if takaran_saji > 0 else 0
-    rasio_gula_karbo = (gula / karbohidrat * 100) if karbohidrat > 0 else 0
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Kepadatan Energi", f"{kepadatan:.2f} kkal/g")
-    col2.metric("Rasio Gula dari Karbohidrat", f"{rasio_gula_karbo:.2f}%")
-    col3.metric("Natrium per Saji", f"{natrium:.0f} mg")
-
-    st.write("Pemenuhan angka kecukupan gizi harian berdasarkan profil pengguna:")
     gula_pct = (gula / current_threshold["gula"] * 100) if current_threshold["gula"] else 0
     natrium_pct = (natrium / current_threshold["natrium"] * 100) if current_threshold["natrium"] else 0
     lemak_jenuh_pct = (lemak_jenuh / current_threshold["lemak_jenuh"] * 100) if current_threshold["lemak_jenuh"] else 0
 
-    st.write(f"Gula: {gula:.2f} g dari batas {current_threshold['gula']:.2f} g per hari. Persentase: {gula_pct:.2f}%")
+    st.write(f"**Gula:** {gula:.2f} g dari batas {current_threshold['gula']:.2f} g per hari. ({gula_pct:.2f}%)")
     st.progress(min(int(round(gula_pct)), 100))
-    st.write(f"Natrium: {natrium:.0f} mg dari batas {current_threshold['natrium']:.0f} mg per hari. Persentase: {natrium_pct:.2f}%")
+    
+    st.write(f"**Natrium:** {natrium:.0f} mg dari batas {current_threshold['natrium']:.0f} mg per hari. ({natrium_pct:.2f}%)")
     st.progress(min(int(round(natrium_pct)), 100))
-    st.write(f"Lemak jenuh: {lemak_jenuh:.2f} g dari batas {current_threshold['lemak_jenuh']:.2f} g per hari. Persentase: {lemak_jenuh_pct:.2f}%")
+    
+    st.write(f"**Lemak jenuh:** {lemak_jenuh:.2f} g dari batas {current_threshold['lemak_jenuh']:.2f} g per hari. ({lemak_jenuh_pct:.2f}%)")
     st.progress(min(int(round(lemak_jenuh_pct)), 100))
 
 
@@ -439,33 +514,30 @@ def render_analysis_result(analysis_result, current_threshold, current_signature
         return
 
     risk_score = float(analysis_result.get("risk_score", 0))
+    risk_info = analysis_result.get("risk_info", classify_risk(risk_score))
     xai_factors = analysis_result.get("xai_factors", {})
     recommendation = analysis_result.get("recommendation", "")
     nutrition_data = analysis_result.get("nutrition_data", {})
     takaran_saji = analysis_result.get("takaran_saji", 0)
     komposisi = analysis_result.get("komposisi", "")
 
+    # Tampilan Urutan Layout Baru
     render_risk_status(risk_score)
+    
     st.markdown("#### Radar Kontribusi Nutrisi")
     render_xai_radar(xai_factors)
-    st.markdown("#### Rekomendasi")
-    st.info(recommendation)
-
-    if analysis_result.get("is_upf"):
-        st.error("Indikasi bahan ultra proses terdeteksi")
-        st.write(", ".join(analysis_result.get("upf_flags", [])))
+    
+    st.write("")
+    render_recommendation_details(risk_info, recommendation, analysis_result.get("is_upf"), analysis_result.get("upf_flags", []))
+    
+    st.markdown("---")
+    render_holistic_nutrition_profile(nutrition_data, takaran_saji)
 
     st.markdown("---")
     render_health_metrics(nutrition_data, takaran_saji, current_threshold)
 
 
 def store_product_analysis_result(product_name, takaran_saji, nutrition_data, komposisi, store_key, input_signature=None):
-    """Menganalisis produk lalu menyimpan hasil tanpa langsung merender output.
-
-    Streamlit selalu melakukan rerun setelah tombol diklik. Jika hasil langsung dirender
-    di bawah tombol dan juga dirender di panel hasil, tampilan menjadi dobel. Fungsi ini
-    menjaga satu sumber tampilan hasil, yaitu panel Hasil Analisis AI di samping form.
-    """
     analysis_result = build_analysis_result(product_name, takaran_saji, nutrition_data, komposisi)
     analysis_result["input_signature"] = input_signature or make_analysis_signature(product_name, takaran_saji, nutrition_data, komposisi)
 
@@ -486,10 +558,6 @@ def store_product_analysis_result(product_name, takaran_saji, nutrition_data, ko
 
 
 def run_product_analysis(product_name, takaran_saji, nutrition_data, komposisi, current_threshold, store_key=None, input_signature=None):
-    """Fungsi lama tetap disediakan untuk kompatibilitas internal.
-
-    Untuk fitur utama, gunakan store_product_analysis_result agar hasil tidak tampil dobel.
-    """
     target_key = store_key or "manual_analysis_result"
     analysis_result = store_product_analysis_result(
         product_name,
@@ -503,12 +571,6 @@ def run_product_analysis(product_name, takaran_saji, nutrition_data, komposisi, 
     return analysis_result
 
 def input_form(prefix, defaults):
-    """Form input yang aman terhadap Session State Streamlit.
-
-    Prinsipnya: nilai default dimasukkan ke session_state sebelum widget dibuat,
-    lalu widget tidak lagi diberi parameter value. Cara ini menghapus warning
-    default value versus Session State API.
-    """
     name_key = f"{prefix}_name"
     saji_key = f"{prefix}_saji"
     energi_key = f"{prefix}_energi"
@@ -568,7 +630,6 @@ def input_form(prefix, defaults):
     )
 
     return product_name, takaran_saji, nutrition_data, komposisi
-
 
 
 with st.sidebar:

@@ -287,7 +287,7 @@ def load_prediction_models():
 
     try:
         if tf is not None:
-            keras_path = os.path.join(model_path, "cb1_bab3.keras")
+            keras_path = os.path.join(model_path, "cb1.keras")
             if os.path.exists(keras_path):
                 base_model = tf.keras.models.load_model(keras_path)
                 try:
@@ -299,7 +299,7 @@ def load_prediction_models():
         print(f"Model Keras gagal dimuat: {exc}")
 
     try:
-        lgbm_path = os.path.join(model_path, "model_lgbm_woa_bab3.joblib")
+        lgbm_path = os.path.join(model_path, "model_lgbm_woa.joblib")
         if os.path.exists(lgbm_path):
             lgbm_model = joblib.load(lgbm_path)
     except Exception as exc:
