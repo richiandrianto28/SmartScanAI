@@ -477,11 +477,6 @@ def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
 
 
 def custom_progress_bar(label, current_val, max_val, unit, color, percentage):
-    """
-    Desain direvisi sesuai tangkapan layar (image_daabc3.png):
-    Label teks berada di sebelah kiri.
-    Angka dan Persentase berada sejajar di sebelah kanan atas progress bar.
-    """
     display_pct = min(percentage, 100)
     
     warning_text = ""
@@ -508,7 +503,6 @@ def custom_progress_bar(label, current_val, max_val, unit, color, percentage):
 
 
 def render_health_metrics(nutrition_data, takaran_saji, current_threshold, show_header=True):
-    """Parameter show_header ditambahkan agar bisa disembunyikan jika dilooping pada fitur Batch."""
     if show_header:
         st.markdown("### 🎯 Pemenuhan Angka Kecukupan Gizi Harian")
         st.caption("Berdasarkan profil pengguna dan batas ambang kesehatan medis Anda:")
@@ -966,7 +960,6 @@ elif app_mode == "Analisis Batch Excel":
                 }
                 komposisi = row.get("Komposisi", "")
                 
-                # Mengambil nilai takaran saji dari excel. Jika tidak ada, default aman adalah 100g.
                 takaran_saji = float(row.get("Takaran Saji", row.get("Takaran", 100.0)))
                 product_name = str(row.get("Nama Produk", row.get("Produk", row.get("Kemasan", f"Produk {idx+1}"))))
 
@@ -1009,7 +1002,6 @@ elif app_mode == "Analisis Batch Excel":
             
             st.header("Hasil Analisis Batch")
             
-            # Agar tabel di UI tetap bersih, kita hilangkan kolom dict mentah sebelum menampilkannya
             display_cols = ["Nama Produk", "Skor Risiko", "Klasifikasi", "Rekomendasi"]
             st.dataframe(st.session_state.batch_result_df[display_cols], use_container_width=True)
             
@@ -1047,74 +1039,55 @@ elif app_mode == "Analisis Batch Excel":
                         fig_pie.update_layout(showlegend=False, margin=dict(t=20, b=20, l=20, r=20), height=400)
                         st.plotly_chart(fig_pie, use_container_width=True)
 
+                    # PERUBAHAN UTAMA: Membuang Plotly go.Bar, menggantinya dengan HTML Dinamis bergaya modern 
+                    # yang persis menyerupai desain visualisasi pada Pemenuhan Angka Kecukupan Gizi Harian.
                     with col_chart2:
-                        st.markdown("**Bar Chart**")
-                        st.write("Menampilkan:\nProduk vs Skor Risiko")
+                        st.markdown("**Bar Chart (Skor Risiko)**")
+                        st.write("Menampilkan tingkat risiko dari tiap produk:")
                         
-                        bar_data = valid_df.sort_values(by="Skor Risiko Numerik", ascending=True)
+                        bar_data = valid_df.sort_values(by="Skor Risiko Numerik", ascending=False)
                         
                         modern_palette = [
-                            "#F39C12", "#3498DB", "#9B59B6", "#E67E22", "#2ECC71",
-                            "#1ABC9C", "#E74C3C", "#FF6B6B", "#48DBFB", "#10AC84",
-                            "#5F27CD", "#00D2D3", "#54A0FF", "#2C3E50", "#6C5CE7"
+                            "#F59E0B", "#3B82F6", "#8B5CF6", "#10B981", "#EF4444", 
+                            "#06B6D4", "#F97316", "#EC4899", "#84CC16", "#14B8A6",
+                            "#6366F1", "#F43F5E", "#0EA5E9", "#10B981", "#8B5CF6"
                         ]
-                        bar_colors = [modern_palette[i % len(modern_palette)] for i in range(len(bar_data))]
 
-                        fig_bar = go.Figure(go.Bar(
-                            x=bar_data["Skor Risiko Numerik"],
-                            y=bar_data["Nama Produk"],
-                            orientation='h',
-                            text=bar_data["Skor Risiko Numerik"].apply(lambda x: f"  <b>{x:.1f}%</b>"),
-                            textposition='outside',
-                            marker=dict(
-                                color=bar_colors,
-                                cornerradius=15
-                            ),
-                            hovertemplate="<b>%{y}</b><br>Skor Risiko: %{x:.2f}%<extra></extra>"
-                        ))
-                        
-                        dynamic_height = max(400, len(bar_data) * 45)
-                        
-                        fig_bar.update_layout(
-                            margin=dict(t=40, b=40, l=20, r=70), 
-                            height=dynamic_height,
-                            xaxis=dict(
-                                title="Skor Risiko (%)",
-                                range=[0, 115],
-                                gridcolor="rgba(226, 232, 240, 0.4)",
-                                showgrid=True
-                            ),
-                            yaxis=dict(
-                                tickfont=dict(weight="bold"),
-                                showgrid=False
-                            ),
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            plot_bgcolor="rgba(248, 250, 252, 0.6)",
-                            font=dict(size=14, family="'Inter', sans-serif"),
-                            bargap=0.35
-                        )
-                        st.plotly_chart(fig_bar, use_container_width=True)
+                        html_bars = "<div style='margin-top: 16px;'>"
+                        for i, (_, row_data) in enumerate(bar_data.iterrows()):
+                            prod_name = row_data["Nama Produk"]
+                            score = float(row_data["Skor Risiko Numerik"])
+                            color = modern_palette[i % len(modern_palette)]
+                            
+                            html_bars += f"""
+                            <div style='margin-bottom: 22px; font-family: "Inter", "Segoe UI", sans-serif;'>
+                                <div style='display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;'>
+                                    <span style='font-weight: 600; font-size: 14.5px; color: #0F172A;'>{prod_name}</span>
+                                    <span style='font-weight: 700; font-size: 14px; color: #334155;'>{score:.1f}%</span>
+                                </div>
+                                <div style='width: 100%; background-color: #E2E8F0; border-radius: 8px; height: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);'>
+                                    <div style='width: {min(score, 100)}%; background-color: {color}; height: 100%; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: width 0.8s ease-out;'></div>
+                                </div>
+                            </div>
+                            """
+                        html_bars += "</div>"
+                        st.markdown(html_bars, unsafe_allow_html=True)
                         
                     st.caption("Pengguna lebih mudah memahami hasil.")
                 else:
                     st.info("Tidak ada data valid yang bisa divisualisasikan dalam grafik.")
                     
-                # --- INTEGRASI FITUR PEMENUHAN GIZI BATCH ---
                 st.markdown("---")
                 st.markdown("### 🎯 Detail Pemenuhan Angka Kecukupan Gizi Harian per Produk")
                 st.caption("Klik (*expand*) pada nama produk untuk melihat rincian pemenuhan batas harian.")
                 
-                # Menggunakan expander untuk merapikan layout, dirender hanya untuk produk valid
                 for idx, row in valid_df.iterrows():
                     with st.expander(f"📦 {row['Nama Produk']} — Klasifikasi: {row['Klasifikasi']} (Skor: {row['Skor Risiko Numerik']:.1f}%)"):
-                        # Memanggil render_health_metrics dengan show_header=False agar menghindari duplikasi judul di dalam expander
                         render_health_metrics(row['nutrition_data'], row['takaran_saji'], current_threshold, show_header=False)
-                # ----------------------------------------------
                 
             except Exception as e:
                 st.error(f"Terjadi masalah saat merender visualisasi batch: {e}")
             
-            # Export ke Excel hanya menyertakan kolom display (tanpa kolom array/dict)
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
                 df_to_excel = st.session_state.batch_result_df[display_cols]
