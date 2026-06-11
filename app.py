@@ -180,7 +180,6 @@ NUTRITION_KEYS = [
     "natrium_benzoat",
 ]
 
-# Preset diperbarui dengan angka yang masuk akal dan memenuhi kriteria Aman, Sedang, dan Tinggi
 EXAMPLE_PRESETS = {
     "Kosong": {
         "product_name": "",
@@ -242,7 +241,6 @@ EXAMPLE_PRESETS = {
 
 
 def apply_manual_preset():
-    """Fungsi Callback: Menimpa nilai di session_state saat opsi preset manual diubah."""
     preset_name = st.session_state.preset_selector
     defaults = EXAMPLE_PRESETS[preset_name]
     
@@ -369,9 +367,9 @@ def render_xai_radar(xai_factors):
             r=norm_values + [norm_values[0]],
             theta=categories + [categories[0]],
             fill="toself",
-            fillcolor="rgba(79, 70, 229, 0.4)", # Warna indigo transparan modern
-            line=dict(color="#4F46E5", width=2.5), # Garis batas tegas
-            marker=dict(symbol="circle", size=8, color="#312E81"), # Titik marker yang jelas
+            fillcolor="rgba(79, 70, 229, 0.4)",
+            line=dict(color="#4F46E5", width=2.5),
+            marker=dict(symbol="circle", size=8, color="#312E81"),
             name="Kandungan Produk",
             hoverinfo="r+theta"
         )
@@ -382,14 +380,14 @@ def render_xai_radar(xai_factors):
                 visible=True, 
                 range=[0, 100], 
                 showticklabels=False,
-                gridcolor="rgba(200, 200, 200, 0.3)", # Grid lebih halus
+                gridcolor="rgba(200, 200, 200, 0.3)",
                 linecolor="rgba(200, 200, 200, 0.3)"
             ),
             angularaxis=dict(
                 gridcolor="rgba(200, 200, 200, 0.3)",
                 linecolor="rgba(200, 200, 200, 0.3)",
             ),
-            bgcolor="rgba(0,0,0,0)" # Background transparan
+            bgcolor="rgba(0,0,0,0)"
         ),
         showlegend=False,
         height=350,
@@ -397,7 +395,6 @@ def render_xai_radar(xai_factors):
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
     )
-    # config displayModeBar=False untuk menyembunyikan toolbar plotly agar lebih estetik
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
 
@@ -488,7 +485,6 @@ def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
 
 
 def custom_progress_bar(label, current_val, max_val, unit, color, percentage):
-    """Fungsi komponen HTML/CSS untuk progress bar kustom yang diratakan (flattened) untuk mencegah bug Markdown."""
     display_pct = min(percentage, 100)
     
     warning_text = ""
@@ -496,7 +492,6 @@ def custom_progress_bar(label, current_val, max_val, unit, color, percentage):
         color = "#E74C3C" 
         warning_text = "<span style='color:#E74C3C; font-weight:bold; font-size: 0.9em; margin-left: 5px;'>(Melebihi Batas!)</span>"
 
-    # Digabungkan menjadi satu string tanpa spasi kosong/newline di awal baris agar tidak dibaca sebagai Markdown Code Block
     html_code = (
         f"<div style='margin-bottom: 24px; font-family: \"Inter\", sans-serif;'>"
         f"<div style='display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px;'>"
@@ -584,7 +579,6 @@ def build_analysis_result(product_name, takaran_saji, nutrition_data, komposisi)
 
 
 def render_analysis_side(analysis_result, current_signature=None):
-    """Merender hasil analisis khusus untuk panel disamping (skor & radar)."""
     if not analysis_result:
         st.info("Hasil analisis akan muncul di sini setelah tombol analisis diklik.")
         return
@@ -607,7 +601,6 @@ def render_analysis_side(analysis_result, current_signature=None):
 
 
 def render_analysis_bottom(analysis_result, current_threshold):
-    """Merender rekomendasi & profil gizi di bagian bawah form secara penuh."""
     if not analysis_result or analysis_result.get("status") == "insufficient":
         return
 
@@ -790,7 +783,6 @@ if app_mode == "Analisis Produk Tunggal":
     with manual_input_col:
         st.subheader("Input Informasi Produk")
         
-        # Inisialisasi dropdown state dengan opsi Kosong
         if "preset_selector" not in st.session_state:
             st.session_state.preset_selector = list(EXAMPLE_PRESETS.keys())[0]
 
@@ -801,7 +793,6 @@ if app_mode == "Analisis Produk Tunggal":
             on_change=apply_manual_preset
         )
         
-        # Kosong default param is safely ignored because the session_state controls it after selection
         product_name, takaran_saji, nutrition_data, komposisi = input_form("manual", EXAMPLE_PRESETS["Kosong"])
         manual_signature = make_analysis_signature(product_name, takaran_saji, nutrition_data, komposisi)
 
@@ -820,7 +811,6 @@ if app_mode == "Analisis Produk Tunggal":
         st.subheader("Hasil Analisis AI (Prediksi Risiko)")
         render_analysis_side(st.session_state.manual_analysis_result, current_signature=manual_signature)
 
-    # Letakkan rekomendasi & profil gizi di luar kolom agar melebar penuh ke bawah
     render_analysis_bottom(st.session_state.manual_analysis_result, current_threshold)
 
 
@@ -843,9 +833,7 @@ elif app_mode == "Scan from Image":
 
         if img_file_1 is not None:
             try:
-                # Gambar asli untuk mesin OCR
                 image_1_original = Image.open(img_file_1)
-                # Gambar yang diseragamkan hanya untuk tampilan UI (menghindari distorsi tampilan)
                 image_1_display = standardize_image_size(image_1_original, target_ratio=4/3)
                 safe_image(image_1_display, caption="Gambar nilai gizi")
 
@@ -855,7 +843,6 @@ elif app_mode == "Scan from Image":
                         if reader_error:
                             scan_result_1, ocr_error_1 = None, reader_error
                         else:
-                            # Proses OCR tetap memakai gambar asli
                             scan_result_1, ocr_error_1 = run_ocr_safely(reader, image_1_original, mode="nutrition")
 
                     if ocr_error_1:
@@ -888,9 +875,7 @@ elif app_mode == "Scan from Image":
 
         if img_file_2 is not None:
             try:
-                # Gambar asli untuk mesin OCR
                 image_2_original = Image.open(img_file_2)
-                # Gambar yang diseragamkan hanya untuk tampilan UI (menghindari distorsi tampilan)
                 image_2_display = standardize_image_size(image_2_original, target_ratio=4/3)
                 safe_image(image_2_display, caption="Gambar komposisi")
 
@@ -900,7 +885,6 @@ elif app_mode == "Scan from Image":
                         if reader_error:
                             scan_result_2, ocr_error_2 = None, reader_error
                         else:
-                            # Proses OCR tetap memakai gambar asli
                             scan_result_2, ocr_error_2 = run_ocr_safely(reader, image_2_original, mode="composition")
 
                     if ocr_error_2:
@@ -947,7 +931,6 @@ elif app_mode == "Scan from Image":
         st.subheader("Hasil Analisis AI (Prediksi Risiko)")
         render_analysis_side(st.session_state.ocr_analysis_result, current_signature=ocr_signature)
         
-    # Letakkan rekomendasi & profil gizi di luar kolom agar melebar penuh ke bawah
     render_analysis_bottom(st.session_state.ocr_analysis_result, current_threshold)
 
 
@@ -987,7 +970,6 @@ elif app_mode == "Analisis Batch Excel":
                 }
                 komposisi = row.get("Komposisi", "")
                 
-                # Mendukung fallback jika kolom nama produk menggunakan header 'Kemasan' dari gambar Anda
                 product_name = str(row.get("Nama Produk", row.get("Produk", row.get("Kemasan", f"Produk {idx+1}"))))
 
                 if not has_sufficient_input(nutrition_data):
@@ -1014,7 +996,6 @@ elif app_mode == "Analisis Batch Excel":
                         "Rekomendasi": recommendation,
                     })
                 
-                # Update visualisasi Progress Bar
                 counter += 1
                 progress_bar.progress(counter / total_rows)
             
@@ -1030,64 +1011,79 @@ elif app_mode == "Analisis Batch Excel":
             st.dataframe(st.session_state.batch_result_df, use_container_width=True)
             
             # --- PENAMBAHAN VISUALISASI BERDASARKAN PERMINTAAN ---
-            st.markdown("### 2. Grafik Distribusi Risiko")
-            st.caption("Tambahkan chart otomatis setelah analisis selesai.")
+            try:
+                st.markdown("---")
+                st.markdown("### 2. Grafik Distribusi Risiko")
+                st.caption("Tambahkan chart otomatis setelah analisis selesai.")
 
-            df_results = st.session_state.batch_result_df
-            
-            # Menghapus baris produk yang 'Data belum cukup' untuk keperluan plotting chart
-            valid_df = df_results[df_results["Klasifikasi"] != "Belum dianalisis"].copy()
-            valid_df["Skor Risiko"] = pd.to_numeric(valid_df["Skor Risiko"], errors='coerce')
-            valid_df = valid_df.dropna(subset=["Skor Risiko"])
+                df_results = st.session_state.batch_result_df.copy()
+                
+                # Mengubah Skor Risiko menjadi format angka dan menghapus data yang gagal diparsing
+                df_results["Skor Risiko Numerik"] = pd.to_numeric(df_results["Skor Risiko"], errors='coerce')
+                valid_df = df_results.dropna(subset=["Skor Risiko Numerik"])
 
-            if not valid_df.empty:
-                col_chart1, col_chart2 = st.columns(2)
-
-                # Pie Chart
-                with col_chart1:
-                    st.markdown("**Pie Chart**\n\nMenunjukkan persentase:\n* Aman\n* Sedang\n* Tinggi")
-                    pie_data = valid_df["Klasifikasi"].value_counts().reset_index()
-                    pie_data.columns = ["Klasifikasi", "Jumlah"]
+                if not valid_df.empty:
+                    col_chart1, col_chart2 = st.columns(2, gap="large")
                     
+                    # Pemetaan warna yang seragam untuk chart
                     color_map = {"Aman": "#2ECC71", "Sedang": "#F39C12", "Tinggi": "#E74C3C"}
-                    fig_pie = go.Figure(data=[go.Pie(
-                        labels=pie_data["Klasifikasi"], 
-                        values=pie_data["Jumlah"], 
-                        hole=0.4,
-                        marker=dict(colors=[color_map.get(c, "#95A5A6") for c in pie_data["Klasifikasi"]])
-                    )])
-                    fig_pie.update_traces(textinfo='percent+label', textfont_size=14)
-                    fig_pie.update_layout(showlegend=True, margin=dict(t=20, b=20, l=20, r=20), height=350)
-                    st.plotly_chart(fig_pie, use_container_width=True)
 
-                # Bar Chart
-                with col_chart2:
-                    st.markdown("**Bar Chart**\n\nMenampilkan:\nProduk vs Skor Risiko")
-                    # Diurutkan berdasarkan skor risiko agar visual bar mendatar lebih rapi
-                    bar_data = valid_df.sort_values(by="Skor Risiko", ascending=True)
-                    
-                    fig_bar = go.Figure(go.Bar(
-                        x=bar_data["Skor Risiko"],
-                        y=bar_data["Nama Produk"],
-                        orientation='h',
-                        text=bar_data["Skor Risiko"].apply(lambda x: f"{x:.0f}"),
-                        textposition='outside',
-                        marker=dict(
-                            color=bar_data["Klasifikasi"].map(color_map).fillna("#3498DB")
+                    # === PIE CHART ===
+                    with col_chart1:
+                        st.markdown("**Pie Chart**")
+                        st.write("Menunjukkan persentase:\n* Aman\n* Sedang\n* Tinggi")
+                        
+                        pie_data = valid_df["Klasifikasi"].value_counts().reset_index()
+                        pie_data.columns = ["Klasifikasi", "Jumlah"]
+                        
+                        pie_colors = [color_map.get(c, "#95A5A6") for c in pie_data["Klasifikasi"]]
+                        
+                        fig_pie = go.Figure(data=[go.Pie(
+                            labels=pie_data["Klasifikasi"], 
+                            values=pie_data["Jumlah"], 
+                            hole=0.4,
+                            marker=dict(colors=pie_colors)
+                        )])
+                        fig_pie.update_traces(textinfo='percent+label', textfont_size=14)
+                        fig_pie.update_layout(showlegend=False, margin=dict(t=20, b=20, l=20, r=20), height=400)
+                        st.plotly_chart(fig_pie, use_container_width=True)
+
+                    # === BAR CHART ===
+                    with col_chart2:
+                        st.markdown("**Bar Chart**")
+                        st.write("Menampilkan:\nProduk vs Skor Risiko")
+                        
+                        # Sort data agar nilai terbesar atau terkecil terurut rapi
+                        bar_data = valid_df.sort_values(by="Skor Risiko Numerik", ascending=True)
+                        bar_colors = [color_map.get(c, "#3498DB") for c in bar_data["Klasifikasi"]]
+
+                        fig_bar = go.Figure(go.Bar(
+                            x=bar_data["Skor Risiko Numerik"],
+                            y=bar_data["Nama Produk"],
+                            orientation='h',
+                            text=bar_data["Skor Risiko Numerik"].apply(lambda x: f"{x:.0f}"),
+                            textposition='outside',
+                            marker=dict(color=bar_colors)
+                        ))
+                        
+                        # Set height dinamis agar batang grafik tidak berdesakan jika datanya banyak (misal: 20 produk)
+                        dynamic_height = max(400, len(bar_data) * 35)
+                        
+                        fig_bar.update_layout(
+                            margin=dict(t=20, b=20, l=20, r=20), 
+                            height=dynamic_height,
+                            xaxis_title="Skor Risiko",
+                            yaxis_title="",
+                            font=dict(size=14)
                         )
-                    ))
-                    fig_bar.update_layout(
-                        margin=dict(t=20, b=20, l=20, r=20), 
-                        height=350,
-                        xaxis_title="Skor Risiko",
-                        yaxis_title="",
-                        font=dict(size=14)
-                    )
-                    st.plotly_chart(fig_bar, use_container_width=True)
-                    
-                st.caption("Pengguna lebih mudah memahami hasil.")
-            else:
-                st.info("Tidak ada data valid yang bisa divisualisasikan dalam grafik.")
+                        st.plotly_chart(fig_bar, use_container_width=True)
+                        
+                    st.caption("Pengguna lebih mudah memahami hasil.")
+                else:
+                    st.info("Tidak ada data valid yang bisa divisualisasikan dalam grafik.")
+                st.markdown("---")
+            except Exception as e:
+                st.error(f"Terjadi masalah saat merender grafik: {e}")
             # -----------------------------------------------------
             
             output = io.BytesIO()
@@ -1097,7 +1093,6 @@ elif app_mode == "Analisis Batch Excel":
             st.download_button("Download Hasil Excel", output.getvalue(), "hasil_analisis_nutriscan.xlsx")
             
     else:
-        # Bersihkan state hasil jika pengguna menghapus/close file Excel yang diupload
         st.session_state.batch_result_df = None
 
 
