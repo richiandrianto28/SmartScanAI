@@ -557,6 +557,61 @@ def build_analysis_result(product_name, takaran_saji, nutrition_data, komposisi)
     }
 
 
+# FITUR BARU: Generator AI Insight Otomatis untuk Analisis Batch
+def generate_batch_insights(df_results):
+    if df_results is None or df_results.empty:
+        return "Belum ada data untuk dianalisis."
+
+    valid_df = df_results.copy()
+    valid_df["Skor Risiko Numerik"] = pd.to_numeric(valid_df["Skor Risiko"], errors='coerce')
+    valid_df = valid_df.dropna(subset=["Skor Risiko Numerik"])
+
+    if valid_df.empty:
+        return "Data tidak valid untuk membuat ringkasan AI."
+
+    total_products = len(valid_df)
+    aman_count = len(valid_df[valid_df["Klasifikasi"] == "Aman"])
+    pct_aman = (aman_count / total_products) * 100 if total_products > 0 else 0
+
+    highest_risk_row = valid_df.loc[valid_df["Skor Risiko Numerik"].idxmax()]
+    highest_name = highest_risk_row.get("Nama Produk", "Produk Tidak Diketahui")
+    highest_score = highest_risk_row["Skor Risiko Numerik"]
+
+    avg_score = valid_df["Skor Risiko Numerik"].mean()
+    if avg_score < 35:
+        avg_cat = "rendah hingga sedang"
+    elif avg_score < 70:
+        avg_cat = "sedang hingga tinggi"
+    else:
+        avg_cat = "tinggi"
+
+    reason_text = "kandungan komposisi gizinya"
+    if "nutrition_data" in highest_risk_row and isinstance(highest_risk_row["nutrition_data"], dict):
+        nut_data = highest_risk_row["nutrition_data"]
+        high_factors = []
+        
+        # Heuristik sederhana untuk menyimpulkan penyebab skor tinggi (bisa disesuaikan batasnya)
+        if float(nut_data.get("natrium", 0)) > 300: high_factors.append("natrium")
+        if float(nut_data.get("gula", 0)) > 12: high_factors.append("gula")
+        if float(nut_data.get("lemak_total", 0)) > 10: high_factors.append("lemak")
+        if float(nut_data.get("lemak_jenuh", 0)) > 4: high_factors.append("lemak jenuh")
+        
+        if high_factors:
+            if len(high_factors) > 1:
+                reason_text = f"kandungan {', '.join(high_factors[:-1])} dan {high_factors[-1]} yang relatif tinggi"
+            else:
+                reason_text = f"kandungan {high_factors[0]} yang relatif tinggi"
+
+    insight = (
+        f"Dari **{total_products} produk** yang dianalisis, **{pct_aman:.1f}%** termasuk kategori aman. "
+        f"Produk dengan skor risiko tertinggi adalah **{highest_name}** ({highest_score:.2f}), "
+        f"terutama dipengaruhi oleh {reason_text}. "
+        f"Secara keseluruhan, rata-rata skor risiko batch ini adalah **{avg_score:.1f}** yang menunjukkan "
+        f"tingkat risiko konsumsi berada pada kategori **{avg_cat}**."
+    )
+    return insight
+
+
 def render_analysis_side(analysis_result, current_signature=None):
     if not analysis_result:
         st.info("Hasil analisis akan muncul di sini setelah tombol analisis diklik.")
@@ -987,6 +1042,13 @@ elif app_mode == "Analisis Batch Excel":
             st.success(f"Analisis batch selesai untuk {st.session_state.batch_total_rows} produk!")
             
             st.header("Hasil Analisis Batch")
+
+            # --- FITUR BARU: TAMPILKAN AI INSIGHT OTOMATIS DISINI ---
+            st.markdown("### 🤖 Ringkasan AI Insight Otomatis")
+            insight_text = generate_batch_insights(st.session_state.batch_result_df)
+            st.info(insight_text)
+            st.markdown("---")
+            # --------------------------------------------------------
             
             display_cols = ["Nama Produk", "Skor Risiko", "Klasifikasi", "Rekomendasi"]
             st.dataframe(st.session_state.batch_result_df[display_cols], use_container_width=True)
