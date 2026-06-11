@@ -175,7 +175,7 @@ NUTRITION_KEYS = [
     "natrium_benzoat",
 ]
 
-
+# Preset diperbarui dengan angka yang masuk akal dan memenuhi kriteria Aman, Sedang, dan Tinggi
 EXAMPLE_PRESETS = {
     "Kosong": {
         "product_name": "",
@@ -191,49 +191,68 @@ EXAMPLE_PRESETS = {
         "natrium_benzoat": 0.0,
         "komposisi": "",
     },
-    "Contoh Aman": {
-        "product_name": "Contoh Produk Aman",
-        "takaran_saji": 100.0,
-        "energi": 180.0,
-        "lemak_total": 5.0,
-        "lemak_jenuh": 1.5,
-        "protein": 8.0,
-        "karbohidrat": 22.0,
-        "gula": 6.0,
-        "garam": 0.5,
-        "natrium": 150.0,
-        "natrium_benzoat": 10.0,
-        "komposisi": "Tepung, susu, gula, garam.",
+    "Contoh Aman (Susu Gandum)": {
+        "product_name": "Susu Gandum Murni",
+        "takaran_saji": 200.0,
+        "energi": 120.0,
+        "lemak_total": 3.0,
+        "lemak_jenuh": 1.0,
+        "protein": 6.0,
+        "karbohidrat": 15.0,
+        "gula": 3.0,
+        "garam": 0.25,
+        "natrium": 100.0,
+        "natrium_benzoat": 0.0,
+        "komposisi": "Air, gandum utuh, susu segar, ekstrak malt, sedikit gula tebu, garam laut.",
     },
-    "Contoh Sedang": {
-        "product_name": "Contoh Produk Sedang",
-        "takaran_saji": 100.0,
-        "energi": 320.0,
-        "lemak_total": 15.0,
-        "lemak_jenuh": 6.0,
-        "protein": 13.0,
-        "karbohidrat": 45.0,
-        "gula": 22.0,
-        "garam": 1.8,
-        "natrium": 600.0,
-        "natrium_benzoat": 130.0,
-        "komposisi": "Tepung terigu, gula, minyak nabati, cokelat bubuk, pengembang, garam.",
+    "Contoh Sedang (Biskuit Cokelat)": {
+        "product_name": "Biskuit Cokelat Renyah",
+        "takaran_saji": 50.0,
+        "energi": 250.0,
+        "lemak_total": 12.0,
+        "lemak_jenuh": 5.0,
+        "protein": 4.0,
+        "karbohidrat": 30.0,
+        "gula": 18.0,
+        "garam": 1.0,
+        "natrium": 400.0,
+        "natrium_benzoat": 50.0,
+        "komposisi": "Tepung terigu, gula, lemak reroti, cokelat bubuk, susu bubuk, pengembang, perisa sintetik cokelat, pengawet kalium sorbat.",
     },
-    "Contoh Tinggi": {
-        "product_name": "Contoh Produk Tinggi",
+    "Contoh Tinggi (Keripik Ekstra Pedas)": {
+        "product_name": "Keripik Ekstra Pedas",
         "takaran_saji": 100.0,
-        "energi": 550.0,
-        "lemak_total": 30.0,
-        "lemak_jenuh": 14.0,
-        "protein": 22.0,
-        "karbohidrat": 75.0,
-        "gula": 45.0,
-        "garam": 4.0,
-        "natrium": 1500.0,
-        "natrium_benzoat": 300.0,
-        "komposisi": "Gula, sirup fruktosa, minyak nabati terhidrogenasi, penguat rasa, pengawet natrium benzoat, perisa sintetik.",
+        "energi": 500.0,
+        "lemak_total": 25.0,
+        "lemak_jenuh": 12.0,
+        "protein": 5.0,
+        "karbohidrat": 60.0,
+        "gula": 40.0,
+        "garam": 3.0,
+        "natrium": 1200.0,
+        "natrium_benzoat": 200.0,
+        "komposisi": "Jagung, minyak nabati terhidrogenasi, gula, sirup fruktosa, bumbu pedas (mengandung mononatrium glutamat, pewarna sintetik kuning FCF, pemanis buatan aspartam), pengawet natrium benzoat.",
     },
 }
+
+
+def apply_manual_preset():
+    """Fungsi Callback: Menimpa nilai di session_state saat opsi preset manual diubah."""
+    preset_name = st.session_state.preset_selector
+    defaults = EXAMPLE_PRESETS[preset_name]
+    
+    st.session_state["manual_name"] = defaults["product_name"]
+    st.session_state["manual_saji"] = defaults["takaran_saji"]
+    st.session_state["manual_energi"] = defaults["energi"]
+    st.session_state["manual_lemak"] = defaults["lemak_total"]
+    st.session_state["manual_jenuh"] = defaults["lemak_jenuh"]
+    st.session_state["manual_protein"] = defaults["protein"]
+    st.session_state["manual_karbo"] = defaults["karbohidrat"]
+    st.session_state["manual_gula"] = defaults["gula"]
+    st.session_state["manual_garam"] = defaults["garam"]
+    st.session_state["manual_natrium"] = defaults["natrium"]
+    st.session_state["manual_benzoat"] = defaults["natrium_benzoat"]
+    st.session_state["manual_komposisi"] = defaults["komposisi"]
 
 
 def init_parsed_data():
@@ -765,10 +784,20 @@ if app_mode == "Analisis Produk Tunggal":
 
     with manual_input_col:
         st.subheader("Input Informasi Produk")
-        preset_name = st.selectbox("Pilih contoh uji atau isi manual", list(EXAMPLE_PRESETS.keys()), index=1)
-        defaults = dict(EXAMPLE_PRESETS[preset_name])
+        
+        # Inisialisasi dropdown state dengan opsi Kosong
+        if "preset_selector" not in st.session_state:
+            st.session_state.preset_selector = list(EXAMPLE_PRESETS.keys())[0]
 
-        product_name, takaran_saji, nutrition_data, komposisi = input_form("manual", defaults)
+        st.selectbox(
+            "Pilih contoh uji atau isi manual", 
+            list(EXAMPLE_PRESETS.keys()), 
+            key="preset_selector",
+            on_change=apply_manual_preset
+        )
+        
+        # Kosong default param is safely ignored because the session_state controls it after selection
+        product_name, takaran_saji, nutrition_data, komposisi = input_form("manual", EXAMPLE_PRESETS["Kosong"])
         manual_signature = make_analysis_signature(product_name, takaran_saji, nutrition_data, komposisi)
 
         if st.button("Analisis AI dan Gizi", type="primary"):
