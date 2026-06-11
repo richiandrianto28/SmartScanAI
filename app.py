@@ -26,32 +26,6 @@ st.set_page_config(
     layout="wide",
 )
 
-# Injeksi CSS Kustom untuk memperbesar font size UI secara global tanpa merusak estetika
-st.markdown("""
-    <style>
-    /* Memperbesar ukuran base font Streamlit */
-    html, body, [class*="st-"] {
-        font-size: 1.05rem;
-    }
-    
-    /* Memperbesar label pada input form */
-    .stWidgetLabel label {
-        font-size: 1.05rem !important;
-        font-weight: 500 !important;
-    }
-    
-    /* Memperbesar ukuran font pada tooltip/help */
-    .stTooltipIcon {
-        font-size: 1.1rem !important;
-    }
-    
-    /* Menyesuaikan text-area dan text-input agar font lebih nyaman dibaca */
-    textarea, input {
-        font-size: 1.05rem !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
 
 if "scan_history" not in st.session_state:
     st.session_state.scan_history = []
@@ -109,11 +83,6 @@ def fmt(value, digits=2, suffix=""):
         return f"{float(value):.{digits}f}{suffix}"
     except Exception:
         return f"0.{'0' * digits}{suffix}"
-
-
-def render_custom_caption(text):
-    """Alternatif st.caption dengan font yang lebih besar namun warna tetap estetik abu-abu."""
-    st.markdown(f"<div style='font-size: 1.05rem; color: #6c757d; margin-top: -8px; margin-bottom: 12px;'>{text}</div>", unsafe_allow_html=True)
 
 
 def run_ocr_safely(reader, image, mode):
@@ -186,8 +155,8 @@ def render_ocr_result_debug(scan_result, label):
                 st.warning(item)
 
     with st.expander(f"Lihat teks OCR {label}", expanded=False):
-        render_custom_caption(f"Variasi gambar terbaik: {scan_result.get('best_variant', 'tidak diketahui')}")
-        st.code(scan_result.get("raw_text") or "Tidak ada teks terbaca", language="text")
+        st.caption(f"Variasi gambar terbaik: {scan_result.get('best_variant', 'tidak diketahui')}")
+        st.text(scan_result.get("raw_text") or "Tidak ada teks terbaca")
 
     with st.expander(f"Ringkasan variasi preprocessing {label}", expanded=False):
         names = list(scan_result.get("variants", {}).keys())
@@ -412,15 +381,14 @@ def render_xai_radar(xai_factors):
                 linecolor="rgba(200, 200, 200, 0.3)"
             ),
             angularaxis=dict(
-                tickfont=dict(size=14), # Memperbesar font label radar agar terbaca
                 gridcolor="rgba(200, 200, 200, 0.3)",
                 linecolor="rgba(200, 200, 200, 0.3)",
             ),
             bgcolor="rgba(0,0,0,0)" # Background transparan
         ),
         showlegend=False,
-        height=380, # Tinggi sedikit dinaikkan
-        margin=dict(l=50, r=50, t=40, b=40),
+        height=350,
+        margin=dict(l=40, r=40, t=30, b=30),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
     )
@@ -429,8 +397,7 @@ def render_xai_radar(xai_factors):
 
 
 def render_recommendation_details(risk_info, recommendation_text, is_upf, upf_flags):
-    # PERUBAHAN 4: Rekomendasi
-    st.markdown("<h2 style='font-weight: 800; font-size: 1.6rem; color: #2C3E50;'>Rekomendasi</h2>", unsafe_allow_html=True)
+    st.markdown("### Rekomendasi")
     
     if risk_info["style"] == "success":
         st.info(f"{recommendation_text}")
@@ -447,20 +414,15 @@ def render_recommendation_details(risk_info, recommendation_text, is_upf, upf_fl
     
     with st.expander("ℹ️ Detail Penjelasan Klasifikasi Nutrisi", expanded=False):
         st.markdown("""
-        <div style='font-size: 1.05rem;'>
-        <ul style='margin-bottom: 0;'>
-            <li>🟢 <b>Aman (0 - 34.99):</b> Produk relatif aman dan sehat. Cocok untuk dikonsumsi dalam porsi wajar sebagai bagian dari asupan nutrisi harian Anda.</li>
-            <li>🟡 <b>Sedang (35 - 69.99):</b> Kandungan produk memiliki beberapa catatan (misal: kalori cukup padat atau ada gula tambahan). Boleh dikonsumsi sesekali, namun bukan untuk konsumsi utama harian yang berulang-ulang.</li>
-            <li>🔴 <b>Tinggi (70 - 100):</b> Sangat disarankan untuk dibatasi. Produk ini kemungkinan besar padat energi tanpa nutrisi bermanfaat (empty calories), tinggi gula/garam, atau merupakan produk <i>ultra-processed</i>.</li>
-        </ul>
-        </div>
-        """, unsafe_allow_html=True)
+        * 🟢 **Aman (0 - 34.99):** Produk relatif aman dan sehat. Cocok untuk dikonsumsi dalam porsi wajar sebagai bagian dari asupan nutrisi harian Anda.
+        * 🟡 **Sedang (35 - 69.99):** Kandungan produk memiliki beberapa catatan (misal: kalori cukup padat atau ada gula tambahan). Boleh dikonsumsi sesekali, namun bukan untuk konsumsi utama harian yang berulang-ulang.
+        * 🔴 **Tinggi (70 - 100):** Sangat disarankan untuk dibatasi. Produk ini kemungkinan besar padat energi tanpa nutrisi bermanfaat (empty calories), tinggi gula/garam, atau merupakan produk *ultra-processed*.
+        """)
 
 
 def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
-    # PERUBAHAN 5: Profil Gizi & Makronutrien Holistik
-    st.markdown("<h2 style='font-weight: 800; font-size: 1.6rem; color: #2C3E50;'>📊 Profil Gizi & Makronutrien Holistik</h2>", unsafe_allow_html=True)
-    render_custom_caption("Analisis mendalam mengenai sumber kalori dan dampak glikemik berdasarkan takaran saji.")
+    st.markdown("### 📊 Profil Gizi & Makronutrien Holistik")
+    st.caption("Analisis mendalam mengenai sumber kalori dan dampak glikemik berdasarkan takaran saji.")
 
     energi = float(nutrition_data.get("energi", 0))
     gula = float(nutrition_data.get("gula", 0))
@@ -474,32 +436,30 @@ def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
     col1, col2 = st.columns(2)
 
     with col1:
-        # PERUBAHAN 6: Kepadatan Energi (kkal/gram)
-        st.markdown("<div style='font-size: 1.25rem; font-weight: 800; color: #1E3A8A; margin-bottom: 5px;'>Kepadatan Energi (kkal/gram)</div>", unsafe_allow_html=True)
+        st.markdown("**Kepadatan Energi (kkal/gram)**")
         st.markdown(f"## {kepadatan:.1f}")
         if kepadatan > 4.0:
             st.error("↑ 🔴 Sangat Tinggi (Padat Kalori)")
-            render_custom_caption("Menunjukkan seberapa padat kalori dalam produk ini. Kepadatan tinggi memicu obesitas jika tidak dikontrol.")
+            st.caption("Menunjukkan seberapa padat kalori dalam produk ini. Kepadatan tinggi memicu obesitas jika tidak dikontrol.")
         elif kepadatan >= 1.5:
             st.warning("— 🟡 Sedang")
-            render_custom_caption("Kepadatan kalori moderat. Perhatikan porsi konsumsi Anda.")
+            st.caption("Kepadatan kalori moderat. Perhatikan porsi konsumsi Anda.")
         else:
             st.success("↓ 🟢 Rendah Kalori")
-            render_custom_caption("Produk ini memiliki kepadatan energi yang rendah, baik untuk mengontrol asupan kalori.")
+            st.caption("Produk ini memiliki kepadatan energi yang rendah, baik untuk mengontrol asupan kalori.")
 
     with col2:
-        # PERUBAHAN 7: Rasio Gula dari Total Karbohidrat
-        st.markdown("<div style='font-size: 1.25rem; font-weight: 800; color: #1E3A8A; margin-bottom: 5px;'>Rasio Gula dari Total Karbohidrat</div>", unsafe_allow_html=True)
+        st.markdown("**Rasio Gula dari Total Karbohidrat**")
         st.markdown(f"## {rasio_gula:.1f}%")
         if rasio_gula > 50:
             st.error("↑ 🔴 Tinggi Gula Sederhana")
-            render_custom_caption("Jika >50%, sebagian besar karbohidrat adalah gula sederhana yang bisa memicu lonjakan gula darah (<i>sugar spike</i>).")
+            st.caption("Jika >50%, sebagian besar karbohidrat adalah gula sederhana yang bisa memicu lonjakan gula darah (*sugar spike*).")
         elif rasio_gula >= 20:
             st.warning("— 🟡 Sedang")
-            render_custom_caption("Mengandung gula sederhana dalam jumlah sedang.")
+            st.caption("Mengandung gula sederhana dalam jumlah sedang.")
         else:
             st.success("↓ 🟢 Rendah Gula")
-            render_custom_caption("Sebagian besar karbohidrat berasal dari sumber kompleks yang lebih lama dicerna.")
+            st.caption("Sebagian besar karbohidrat berasal dari sumber kompleks yang lebih lama dicerna.")
 
     st.write("")
     st.markdown("**Distribusi Sumber Kalori (Macronutrient Split)**")
@@ -515,7 +475,7 @@ def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
         colors = ['#E74C3C', '#2ECC71', '#3498DB'] 
 
         fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.5, marker=dict(colors=colors))])
-        fig.update_traces(textinfo='percent+label', textposition='inside', textfont_size=14)
+        fig.update_traces(textinfo='percent+label', textposition='inside')
         fig.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10), height=350)
         st.plotly_chart(fig, use_container_width=True)
     else:
@@ -529,20 +489,20 @@ def custom_progress_bar(label, current_val, max_val, unit, color, percentage):
     warning_text = ""
     if percentage > 100:
         color = "#E74C3C" 
-        warning_text = "<span style='color:#E74C3C; font-weight:bold; font-size: 1.0rem; margin-left: 6px;'>(Melebihi Batas!)</span>"
+        warning_text = "<span style='color:#E74C3C; font-weight:bold; font-size: 0.9em; margin-left: 5px;'>(Melebihi Batas!)</span>"
 
-    # Diperbarui dengan ukuran font yang lebih ramah mata
+    # Digabungkan menjadi satu string tanpa spasi kosong/newline di awal baris agar tidak dibaca sebagai Markdown Code Block
     html_code = (
         f"<div style='margin-bottom: 24px; font-family: \"Inter\", sans-serif;'>"
-        f"<div style='display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;'>"
-        f"<span style='font-weight: 600; font-size: 1.15rem; color: #2C3E50;'>{label}</span>"
-        f"<span style='color: #34495E; font-size: 1.05rem;'>"
+        f"<div style='display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px;'>"
+        f"<span style='font-weight: 600; font-size: 1.05em; color: #2C3E50;'>{label}</span>"
+        f"<span style='color: #34495E; font-size: 0.95em;'>"
         f"<b>{current_val:.2f}</b> / {max_val:.2f} {unit} "
         f"<span style='color: #7F8C8D; margin-left: 4px;'>({percentage:.1f}%)</span>"
         f"{warning_text}"
         f"</span>"
         f"</div>"
-        f"<div style='width: 100%; background-color: #E2E8F0; border-radius: 999px; height: 16px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);'>"
+        f"<div style='width: 100%; background-color: #E2E8F0; border-radius: 999px; height: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);'>"
         f"<div style='width: {display_pct}%; background-color: {color}; height: 100%; border-radius: 999px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: width 0.8s ease-out;'></div>"
         f"</div>"
         f"</div>"
@@ -551,9 +511,8 @@ def custom_progress_bar(label, current_val, max_val, unit, color, percentage):
 
 
 def render_health_metrics(nutrition_data, takaran_saji, current_threshold):
-    # PERUBAHAN 8: Pemenuhan Angka Kecukupan Gizi Harian
-    st.markdown("<h2 style='font-weight: 800; font-size: 1.6rem; color: #2C3E50;'>🎯 Pemenuhan Angka Kecukupan Gizi Harian</h2>", unsafe_allow_html=True)
-    render_custom_caption("Berdasarkan profil pengguna dan batas ambang kesehatan medis Anda:")
+    st.markdown("### 🎯 Pemenuhan Angka Kecukupan Gizi Harian")
+    st.caption("Berdasarkan profil pengguna dan batas ambang kesehatan medis Anda:")
     st.write("")
 
     gula = float(nutrition_data["gula"])
@@ -809,7 +768,7 @@ with st.sidebar:
 
 
 st.title("SMART NutriScan AI")
-render_custom_caption("Analisis produk pangan berbasis OCR, machine learning, aturan gizi terkalibrasi, dan konfirmasi data manual.")
+st.caption("Analisis produk pangan berbasis OCR, machine learning, aturan gizi terkalibrasi, dan konfirmasi data manual.")
 
 model_ready = all([feat_model, lgbm_model, w2v_model, scaler])
 if model_ready:
@@ -819,14 +778,12 @@ else:
 
 
 if app_mode == "Analisis Produk Tunggal":
-    # PERUBAHAN 1: Analisis Produk Tunggal
-    st.markdown("<h1 style='font-weight: 800; font-size: 2.2rem; color: #1E3A8A; margin-bottom: 20px;'>Analisis Produk Tunggal</h1>", unsafe_allow_html=True)
+    st.header("Analisis Produk Tunggal")
 
     manual_input_col, manual_result_col = st.columns([1.15, 1], gap="large")
 
     with manual_input_col:
-        # PERUBAHAN 2: Input Informasi Produk
-        st.markdown("<h2 style='font-weight: 700; font-size: 1.5rem; color: #2C3E50; margin-bottom: 15px;'>Input Informasi Produk</h2>", unsafe_allow_html=True)
+        st.subheader("Input Informasi Produk")
         
         # Inisialisasi dropdown state dengan opsi Kosong
         if "preset_selector" not in st.session_state:
@@ -855,8 +812,7 @@ if app_mode == "Analisis Produk Tunggal":
             st.success("Analisis berhasil diperbarui. Hasil ditampilkan di panel kanan.")
 
     with manual_result_col:
-        # PERUBAHAN 3: Hasil Analisis AI (Prediksi Risiko)
-        st.markdown("<h2 style='font-weight: 700; font-size: 1.5rem; color: #2C3E50; margin-bottom: 15px;'>Hasil Analisis AI (Prediksi Risiko)</h2>", unsafe_allow_html=True)
+        st.subheader("Hasil Analisis AI (Prediksi Risiko)")
         render_analysis_side(st.session_state.manual_analysis_result, current_signature=manual_signature)
 
     # Letakkan rekomendasi & profil gizi di luar kolom agar melebar penuh ke bawah
@@ -983,8 +939,7 @@ elif app_mode == "Scan from Image":
             st.success("Analisis berhasil diperbarui. Hasil ditampilkan di panel kanan.")
 
     with result_col:
-        # PERUBAHAN 3: Hasil Analisis AI (Prediksi Risiko) (di bagian OCR)
-        st.markdown("<h2 style='font-weight: 700; font-size: 1.5rem; color: #2C3E50; margin-bottom: 15px;'>Hasil Analisis AI (Prediksi Risiko)</h2>", unsafe_allow_html=True)
+        st.subheader("Hasil Analisis AI (Prediksi Risiko)")
         render_analysis_side(st.session_state.ocr_analysis_result, current_signature=ocr_signature)
         
     # Letakkan rekomendasi & profil gizi di luar kolom agar melebar penuh ke bawah
@@ -1062,17 +1017,14 @@ elif app_mode == "Edukasi Gizi":
     st.header("Edukasi Gizi")
     st.markdown(
         """
-        <div style='font-size: 1.1rem; line-height: 1.6;'>
-        <b>Cara membaca hasil aplikasi:</b><br><br>
-        <ol>
-            <li>OCR hanya membantu mengisi data awal, bukan pengganti validasi pengguna.</li>
-            <li>Data kosong tidak dianalisis agar aplikasi tidak memberi klasifikasi palsu.</li>
-            <li>Klasifikasi Aman, Sedang, dan Tinggi memakai satu fungsi keputusan.</li>
-            <li>Gula tinggi perlu diperhatikan karena berpengaruh pada beban asupan harian.</li>
-            <li>Natrium tinggi perlu dibatasi, terutama pada pengguna dengan risiko hipertensi.</li>
-            <li>Lemak jenuh tinggi sebaiknya tidak dikonsumsi terlalu sering.</li>
-            <li>Komposisi dengan pemanis buatan, pewarna sintetik, pengawet, dan penguat rasa menandakan indikasi produk ultra proses.</li>
-        </ol>
-        </div>
-        """, unsafe_allow_html=True
+        **Cara membaca hasil aplikasi:**
+
+        1. OCR hanya membantu mengisi data awal, bukan pengganti validasi pengguna.
+        2. Data kosong tidak dianalisis agar aplikasi tidak memberi klasifikasi palsu.
+        3. Klasifikasi Aman, Sedang, dan Tinggi memakai satu fungsi keputusan.
+        4. Gula tinggi perlu diperhatikan karena berpengaruh pada beban asupan harian.
+        5. Natrium tinggi perlu dibatasi, terutama pada pengguna dengan risiko hipertensi.
+        6. Lemak jenuh tinggi sebaiknya tidak dikonsumsi terlalu sering.
+        7. Komposisi dengan pemanis buatan, pewarna sintetik, pengawet, dan penguat rasa menandakan indikasi produk ultra proses.
+        """
     )
