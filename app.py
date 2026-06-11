@@ -30,7 +30,6 @@ st.set_page_config(
 if "scan_history" not in st.session_state:
     st.session_state.scan_history = []
 
-# Tambahan state untuk menyimpan hasil batch agar tidak hilang saat download
 if "batch_result_df" not in st.session_state:
     st.session_state.batch_result_df = None
     st.session_state.batch_total_rows = 0
@@ -48,8 +47,6 @@ def load_ocr_model():
 
 feat_model, lgbm_model, w2v_model, scaler = load_all_models_and_scaler()
 
-# EasyOCR tidak dimuat saat aplikasi pertama dibuka.
-# Model OCR baru dimuat ketika tombol proses OCR ditekan agar upload gambar tidak langsung membuat app crash.
 def get_ocr_reader_safely():
     try:
         return load_ocr_model(), None
@@ -58,7 +55,6 @@ def get_ocr_reader_safely():
 
 
 def standardize_image_size(image, target_ratio=4/3):
-    """Menyamakan ukuran gambar dengan padding transparan agar seragam dan estetik."""
     width, height = image.size
     current_ratio = width / height
 
@@ -69,7 +65,6 @@ def standardize_image_size(image, target_ratio=4/3):
         new_height = height
         new_width = int(height * target_ratio)
 
-    # Buat kanvas kosong dengan background transparan
     new_img = Image.new("RGBA", (new_width, new_height), (0, 0, 0, 0))
     image = image.convert("RGBA")
     new_img.paste(image, ((new_width - width) // 2, (new_height - height) // 2))
@@ -115,7 +110,6 @@ OCR_WIDGET_KEY_MAP = {
 
 LEGACY_OCR_WIDGET_KEYS = set(OCR_WIDGET_KEY_MAP.values())
 
-# Membersihkan key lama dari versi sebelumnya.
 for _legacy_key in list(LEGACY_OCR_WIDGET_KEYS):
     if _legacy_key in st.session_state:
         del st.session_state[_legacy_key]
@@ -127,10 +121,8 @@ def set_widget_default(key, value):
 
 
 def sync_ocr_value_to_form(key, value):
-    """Menyinkronkan hasil OCR hanya ke data sumber."""
     if key not in st.session_state.ocr_data:
         return
-
     st.session_state.ocr_data[key] = value
 
 
@@ -485,6 +477,11 @@ def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
 
 
 def custom_progress_bar(label, current_val, max_val, unit, color, percentage):
+    """
+    Desain direvisi sesuai tangkapan layar (image_daabc3.png):
+    Label teks berada di sebelah kiri.
+    Angka dan Persentase berada sejajar di sebelah kanan atas progress bar.
+    """
     display_pct = min(percentage, 100)
     
     warning_text = ""
@@ -493,37 +490,39 @@ def custom_progress_bar(label, current_val, max_val, unit, color, percentage):
         warning_text = "<span style='color:#E74C3C; font-weight:bold; font-size: 0.9em; margin-left: 5px;'>(Melebihi Batas!)</span>"
 
     html_code = (
-        f"<div style='margin-bottom: 24px; font-family: \"Inter\", sans-serif;'>"
-        f"<div style='display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px;'>"
-        f"<span style='font-weight: 600; font-size: 1.05em; color: #2C3E50;'>{label}</span>"
-        f"<span style='color: #34495E; font-size: 0.95em;'>"
-        f"<b>{current_val:.2f}</b> / {max_val:.2f} {unit} "
-        f"<span style='color: #7F8C8D; margin-left: 4px;'>({percentage:.1f}%)</span>"
+        f"<div style='margin-bottom: 24px; font-family: \"Inter\", \"Segoe UI\", sans-serif;'>"
+        f"<div style='display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;'>"
+        f"<span style='font-weight: 600; font-size: 15px; color: #0F172A;'>{label}</span>"
+        f"<span style='color: #475569; font-size: 14px;'>"
+        f"<span style='font-weight: 700; color: #1E293B;'>{current_val:.2f}</span> / {max_val:.2f} {unit} "
+        f"<span style='color: #64748B; margin-left: 4px;'>({percentage:.1f}%)</span>"
         f"{warning_text}"
         f"</span>"
         f"</div>"
-        f"<div style='width: 100%; background-color: #E2E8F0; border-radius: 999px; height: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);'>"
-        f"<div style='width: {display_pct}%; background-color: {color}; height: 100%; border-radius: 999px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: width 0.8s ease-out;'></div>"
+        f"<div style='width: 100%; background-color: #E2E8F0; border-radius: 8px; height: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);'>"
+        f"<div style='width: {display_pct}%; background-color: {color}; height: 100%; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: width 0.8s ease-out;'></div>"
         f"</div>"
         f"</div>"
     )
     st.markdown(html_code, unsafe_allow_html=True)
 
 
-def render_health_metrics(nutrition_data, takaran_saji, current_threshold):
-    st.markdown("### 🎯 Pemenuhan Angka Kecukupan Gizi Harian")
-    st.caption("Berdasarkan profil pengguna dan batas ambang kesehatan medis Anda:")
-    st.write("")
+def render_health_metrics(nutrition_data, takaran_saji, current_threshold, show_header=True):
+    """Parameter show_header ditambahkan agar bisa disembunyikan jika dilooping pada fitur Batch."""
+    if show_header:
+        st.markdown("### 🎯 Pemenuhan Angka Kecukupan Gizi Harian")
+        st.caption("Berdasarkan profil pengguna dan batas ambang kesehatan medis Anda:")
+        st.write("")
 
-    gula = float(nutrition_data["gula"])
-    natrium = float(nutrition_data["natrium"])
-    lemak_jenuh = float(nutrition_data["lemak_jenuh"])
+    gula = float(nutrition_data.get("gula", 0))
+    natrium = float(nutrition_data.get("natrium", 0))
+    lemak_jenuh = float(nutrition_data.get("lemak_jenuh", 0))
 
     gula_pct = (gula / current_threshold["gula"] * 100) if current_threshold["gula"] else 0
     natrium_pct = (natrium / current_threshold["natrium"] * 100) if current_threshold["natrium"] else 0
     lemak_jenuh_pct = (lemak_jenuh / current_threshold["lemak_jenuh"] * 100) if current_threshold["lemak_jenuh"] else 0
 
-    custom_progress_bar("Gula", gula, current_threshold["gula"], "g", "#F39C12", gula_pct)
+    custom_progress_bar("Gula", gula, current_threshold["gula"], "g", "#F59E0B", gula_pct)
     custom_progress_bar("Natrium", natrium, current_threshold["natrium"], "mg", "#3498DB", natrium_pct)
     custom_progress_bar("Lemak Jenuh", lemak_jenuh, current_threshold["lemak_jenuh"], "g", "#9B59B6", lemak_jenuh_pct)
 
@@ -617,7 +616,7 @@ def render_analysis_bottom(analysis_result, current_threshold):
     render_holistic_nutrition_profile(nutrition_data, takaran_saji)
 
     st.markdown("---")
-    render_health_metrics(nutrition_data, takaran_saji, current_threshold)
+    render_health_metrics(nutrition_data, takaran_saji, current_threshold, show_header=True)
 
 
 def store_product_analysis_result(product_name, takaran_saji, nutrition_data, komposisi, store_key, input_signature=None):
@@ -943,16 +942,13 @@ elif app_mode == "Analisis Batch Excel":
     if uploaded_file is not None:
         df = pd.read_excel(uploaded_file)
         
-        # 1. Menampilkan preview dataframe input
         st.dataframe(df, use_container_width=True)
         
-        # 2. Tombol untuk memulai proses Analisis Batch
         if st.button("Mulai Analisis Batch", type="primary"):
             df_clean = preprocess_batch_excel_data(df)
             results = []
             total_rows = len(df_clean)
             
-            # 3. Menyiapkan visualisasi Progress Bar
             progress_bar = st.progress(0)
             
             counter = 0
@@ -970,6 +966,8 @@ elif app_mode == "Analisis Batch Excel":
                 }
                 komposisi = row.get("Komposisi", "")
                 
+                # Mengambil nilai takaran saji dari excel. Jika tidak ada, default aman adalah 100g.
+                takaran_saji = float(row.get("Takaran Saji", row.get("Takaran", 100.0)))
                 product_name = str(row.get("Nama Produk", row.get("Produk", row.get("Kemasan", f"Produk {idx+1}"))))
 
                 if not has_sufficient_input(nutrition_data):
@@ -978,6 +976,8 @@ elif app_mode == "Analisis Batch Excel":
                         "Skor Risiko": "Data belum cukup",
                         "Klasifikasi": "Belum dianalisis",
                         "Rekomendasi": "Isi nilai gizi yang valid sebelum analisis.",
+                        "nutrition_data": nutrition_data,
+                        "takaran_saji": takaran_saji
                     })
                 else:
                     risk_score, _, recommendation = analyze_product_fully(
@@ -994,23 +994,25 @@ elif app_mode == "Analisis Batch Excel":
                         "Skor Risiko": round(risk_score, 2),
                         "Klasifikasi": risk_info["label"],
                         "Rekomendasi": recommendation,
+                        "nutrition_data": nutrition_data,
+                        "takaran_saji": takaran_saji
                     })
                 
                 counter += 1
                 progress_bar.progress(counter / total_rows)
             
-            # 4. Menyimpan hasil di Session State agar aman saat tombol download diklik
             st.session_state.batch_result_df = pd.DataFrame(results)
             st.session_state.batch_total_rows = total_rows
             
-        # 5. Merender Hasil (Hanya jika state batch_result_df sudah tersimpan)
         if st.session_state.batch_result_df is not None:
             st.success(f"Analisis batch selesai untuk {st.session_state.batch_total_rows} produk!")
             
             st.header("Hasil Analisis Batch")
-            st.dataframe(st.session_state.batch_result_df, use_container_width=True)
             
-            # --- PENAMBAHAN VISUALISASI BERDASARKAN PERMINTAAN ---
+            # Agar tabel di UI tetap bersih, kita hilangkan kolom dict mentah sebelum menampilkannya
+            display_cols = ["Nama Produk", "Skor Risiko", "Klasifikasi", "Rekomendasi"]
+            st.dataframe(st.session_state.batch_result_df[display_cols], use_container_width=True)
+            
             try:
                 st.markdown("---")
                 st.markdown("### 2. Grafik Distribusi Risiko")
@@ -1018,17 +1020,14 @@ elif app_mode == "Analisis Batch Excel":
 
                 df_results = st.session_state.batch_result_df.copy()
                 
-                # Mengubah Skor Risiko menjadi format angka dan menghapus data yang gagal diparsing
                 df_results["Skor Risiko Numerik"] = pd.to_numeric(df_results["Skor Risiko"], errors='coerce')
                 valid_df = df_results.dropna(subset=["Skor Risiko Numerik"])
 
                 if not valid_df.empty:
                     col_chart1, col_chart2 = st.columns(2, gap="large")
                     
-                    # Pemetaan warna yang seragam untuk chart klasifikasi harian
                     classification_colors = {"Aman": "#2ECC71", "Sedang": "#F39C12", "Tinggi": "#E74C3C"}
 
-                    # === PIE CHART ===
                     with col_chart1:
                         st.markdown("**Pie Chart**")
                         st.write("Menunjukkan persentase:\n* Aman\n* Sedang\n* Tinggi")
@@ -1048,15 +1047,12 @@ elif app_mode == "Analisis Batch Excel":
                         fig_pie.update_layout(showlegend=False, margin=dict(t=20, b=20, l=20, r=20), height=400)
                         st.plotly_chart(fig_pie, use_container_width=True)
 
-                    # === BAR CHART (DIKOREKSI: MODERN, ELEGAN, DAN BERWARNA-WARNI SEPERTI IMAGE_DACA05.PNG) ===
                     with col_chart2:
                         st.markdown("**Bar Chart**")
                         st.write("Menampilkan:\nProduk vs Skor Risiko")
                         
-                        # Mengurutkan data produk berdasarkan tingkat risiko agar visualisasi seimbang
                         bar_data = valid_df.sort_values(by="Skor Risiko Numerik", ascending=True)
                         
-                        # Palet warna UI modern & variatif (setiap bar mendapatkan warna berbeda sesuai urutannya)
                         modern_palette = [
                             "#F39C12", "#3498DB", "#9B59B6", "#E67E22", "#2ECC71",
                             "#1ABC9C", "#E74C3C", "#FF6B6B", "#48DBFB", "#10AC84",
@@ -1068,17 +1064,15 @@ elif app_mode == "Analisis Batch Excel":
                             x=bar_data["Skor Risiko Numerik"],
                             y=bar_data["Nama Produk"],
                             orientation='h',
-                            # Menampilkan nilai skor risiko tepat di luar ujung bar secara tebal (bold)
                             text=bar_data["Skor Risiko Numerik"].apply(lambda x: f"  <b>{x:.1f}%</b>"),
                             textposition='outside',
                             marker=dict(
                                 color=bar_colors,
-                                cornerradius=15  # Membuat efek lengkung kapsul (rounded capsule) modern mirip image_daca05.png
+                                cornerradius=15
                             ),
                             hovertemplate="<b>%{y}</b><br>Skor Risiko: %{x:.2f}%<extra></extra>"
                         ))
                         
-                        # Menghitung tinggi grafik secara dinamis agar produk batch tidak menumpuk berdesakan
                         dynamic_height = max(400, len(bar_data) * 45)
                         
                         fig_bar.update_layout(
@@ -1086,8 +1080,8 @@ elif app_mode == "Analisis Batch Excel":
                             height=dynamic_height,
                             xaxis=dict(
                                 title="Skor Risiko (%)",
-                                range=[0, 115], # Beri ruang ekstra untuk teks persentase skor agar tidak terpotong
-                                gridcolor="rgba(226, 232, 240, 0.4)", # Garis penanda grid yang tipis dan bersih
+                                range=[0, 115],
+                                gridcolor="rgba(226, 232, 240, 0.4)",
                                 showgrid=True
                             ),
                             yaxis=dict(
@@ -1095,24 +1089,38 @@ elif app_mode == "Analisis Batch Excel":
                                 showgrid=False
                             ),
                             paper_bgcolor="rgba(0,0,0,0)",
-                            plot_bgcolor="rgba(248, 250, 252, 0.6)", # Background penahan (track canvas) bernuansa bersih
+                            plot_bgcolor="rgba(248, 250, 252, 0.6)",
                             font=dict(size=14, family="'Inter', sans-serif"),
-                            bargap=0.35 # Spasi antar bar dioptimalkan agar serupa dengan kontainer image_daca05.png
+                            bargap=0.35
                         )
                         st.plotly_chart(fig_bar, use_container_width=True)
                         
                     st.caption("Pengguna lebih mudah memahami hasil.")
                 else:
                     st.info("Tidak ada data valid yang bisa divisualisasikan dalam grafik.")
+                    
+                # --- INTEGRASI FITUR PEMENUHAN GIZI BATCH ---
                 st.markdown("---")
+                st.markdown("### 🎯 Detail Pemenuhan Angka Kecukupan Gizi Harian per Produk")
+                st.caption("Klik (*expand*) pada nama produk untuk melihat rincian pemenuhan batas harian.")
+                
+                # Menggunakan expander untuk merapikan layout, dirender hanya untuk produk valid
+                for idx, row in valid_df.iterrows():
+                    with st.expander(f"📦 {row['Nama Produk']} — Klasifikasi: {row['Klasifikasi']} (Skor: {row['Skor Risiko Numerik']:.1f}%)"):
+                        # Memanggil render_health_metrics dengan show_header=False agar menghindari duplikasi judul di dalam expander
+                        render_health_metrics(row['nutrition_data'], row['takaran_saji'], current_threshold, show_header=False)
+                # ----------------------------------------------
+                
             except Exception as e:
-                st.error(f"Terjadi masalah saat merender grafik: {e}")
-            # -----------------------------------------------------
+                st.error(f"Terjadi masalah saat merender visualisasi batch: {e}")
             
+            # Export ke Excel hanya menyertakan kolom display (tanpa kolom array/dict)
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                st.session_state.batch_result_df.to_excel(writer, index=False, sheet_name="Hasil Analisis")
+                df_to_excel = st.session_state.batch_result_df[display_cols]
+                df_to_excel.to_excel(writer, index=False, sheet_name="Hasil Analisis")
             
+            st.markdown("---")
             st.download_button("Download Hasil Excel", output.getvalue(), "hasil_analisis_nutriscan.xlsx")
             
     else:
