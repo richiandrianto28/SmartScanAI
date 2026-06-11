@@ -960,7 +960,7 @@ elif app_mode == "Analisis Batch Excel":
     if uploaded_file is not None:
         df = pd.read_excel(uploaded_file)
         
-        # 1. Menampilkan preview dataframe input (Sesuai dengan gambar)
+        # 1. Menampilkan preview dataframe input
         st.dataframe(df, use_container_width=True)
         
         # 2. Tombol untuk memulai proses Analisis Batch
@@ -1028,6 +1028,67 @@ elif app_mode == "Analisis Batch Excel":
             
             st.header("Hasil Analisis Batch")
             st.dataframe(st.session_state.batch_result_df, use_container_width=True)
+            
+            # --- PENAMBAHAN VISUALISASI BERDASARKAN PERMINTAAN ---
+            st.markdown("### 2. Grafik Distribusi Risiko")
+            st.caption("Tambahkan chart otomatis setelah analisis selesai.")
+
+            df_results = st.session_state.batch_result_df
+            
+            # Menghapus baris produk yang 'Data belum cukup' untuk keperluan plotting chart
+            valid_df = df_results[df_results["Klasifikasi"] != "Belum dianalisis"].copy()
+            valid_df["Skor Risiko"] = pd.to_numeric(valid_df["Skor Risiko"], errors='coerce')
+            valid_df = valid_df.dropna(subset=["Skor Risiko"])
+
+            if not valid_df.empty:
+                col_chart1, col_chart2 = st.columns(2)
+
+                # Pie Chart
+                with col_chart1:
+                    st.markdown("**Pie Chart**\n\nMenunjukkan persentase:\n* Aman\n* Sedang\n* Tinggi")
+                    pie_data = valid_df["Klasifikasi"].value_counts().reset_index()
+                    pie_data.columns = ["Klasifikasi", "Jumlah"]
+                    
+                    color_map = {"Aman": "#2ECC71", "Sedang": "#F39C12", "Tinggi": "#E74C3C"}
+                    fig_pie = go.Figure(data=[go.Pie(
+                        labels=pie_data["Klasifikasi"], 
+                        values=pie_data["Jumlah"], 
+                        hole=0.4,
+                        marker=dict(colors=[color_map.get(c, "#95A5A6") for c in pie_data["Klasifikasi"]])
+                    )])
+                    fig_pie.update_traces(textinfo='percent+label', textfont_size=14)
+                    fig_pie.update_layout(showlegend=True, margin=dict(t=20, b=20, l=20, r=20), height=350)
+                    st.plotly_chart(fig_pie, use_container_width=True)
+
+                # Bar Chart
+                with col_chart2:
+                    st.markdown("**Bar Chart**\n\nMenampilkan:\nProduk vs Skor Risiko")
+                    # Diurutkan berdasarkan skor risiko agar visual bar mendatar lebih rapi
+                    bar_data = valid_df.sort_values(by="Skor Risiko", ascending=True)
+                    
+                    fig_bar = go.Figure(go.Bar(
+                        x=bar_data["Skor Risiko"],
+                        y=bar_data["Nama Produk"],
+                        orientation='h',
+                        text=bar_data["Skor Risiko"].apply(lambda x: f"{x:.0f}"),
+                        textposition='outside',
+                        marker=dict(
+                            color=bar_data["Klasifikasi"].map(color_map).fillna("#3498DB")
+                        )
+                    ))
+                    fig_bar.update_layout(
+                        margin=dict(t=20, b=20, l=20, r=20), 
+                        height=350,
+                        xaxis_title="Skor Risiko",
+                        yaxis_title="",
+                        font=dict(size=14)
+                    )
+                    st.plotly_chart(fig_bar, use_container_width=True)
+                    
+                st.caption("Pengguna lebih mudah memahami hasil.")
+            else:
+                st.info("Tidak ada data valid yang bisa divisualisasikan dalam grafik.")
+            # -----------------------------------------------------
             
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
