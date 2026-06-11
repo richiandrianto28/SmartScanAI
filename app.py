@@ -484,22 +484,8 @@ def custom_progress_bar(label, current_val, max_val, unit, color, percentage):
         color = "#E74C3C" 
         warning_text = "<span style='color:#E74C3C; font-weight:bold; font-size: 0.9em; margin-left: 5px;'>(Melebihi Batas!)</span>"
 
-    # Penulisan string dipadatkan untuk menghindari error markdown code block
-    html_code = (
-        f"<div style='margin-bottom: 24px; font-family: \"Inter\", \"Segoe UI\", sans-serif;'>"
-        f"<div style='display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;'>"
-        f"<span style='font-weight: 600; font-size: 15px; color: #0F172A;'>{label}</span>"
-        f"<span style='color: #475569; font-size: 14px;'>"
-        f"<span style='font-weight: 700; color: #1E293B;'>{current_val:.2f}</span> / {max_val:.2f} {unit} "
-        f"<span style='color: #64748B; margin-left: 4px;'>({percentage:.1f}%)</span>"
-        f"{warning_text}"
-        f"</span>"
-        f"</div>"
-        f"<div style='width: 100%; background-color: #E2E8F0; border-radius: 8px; height: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);'>"
-        f"<div style='width: {display_pct}%; background-color: {color}; height: 100%; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: width 0.8s ease-out;'></div>"
-        f"</div>"
-        f"</div>"
-    )
+    # Penulisan string disatukan untuk memastikan tidak ada kesalahan rendering markdown code block
+    html_code = f"<div style='margin-bottom: 24px; font-family: \"Inter\", \"Segoe UI\", sans-serif;'><div style='display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;'><span style='font-weight: 600; font-size: 15px; color: #0F172A;'>{label}</span><span style='color: #475569; font-size: 14px;'><span style='font-weight: 700; color: #1E293B;'>{current_val:.2f}</span> / {max_val:.2f} {unit} <span style='color: #64748B; margin-left: 4px;'>({percentage:.1f}%)</span>{warning_text}</span></div><div style='width: 100%; background-color: #E2E8F0; border-radius: 8px; height: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);'><div style='width: {display_pct}%; background-color: {color}; height: 100%; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: width 0.8s ease-out;'></div></div></div>"
     st.markdown(html_code, unsafe_allow_html=True)
 
 
@@ -1052,27 +1038,15 @@ elif app_mode == "Analisis Batch Excel":
                             "#6366F1", "#F43F5E", "#0EA5E9", "#10B981", "#8B5CF6"
                         ]
 
-                        # String HTML digabungkan tanpa indentasi agar tidak terbaca sebagai code block Markdown
-                        html_bars = "<div style='margin-top: 16px;'>"
+                        st.markdown("<div style='margin-top: 16px;'></div>", unsafe_allow_html=True)
                         for i, (_, row_data) in enumerate(bar_data.iterrows()):
                             prod_name = row_data["Nama Produk"]
                             score = float(row_data["Skor Risiko Numerik"])
                             color = modern_palette[i % len(modern_palette)]
                             
-                            html_bars += (
-                                f"<div style='margin-bottom: 22px; font-family: \"Inter\", \"Segoe UI\", sans-serif;'>"
-                                f"<div style='display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;'>"
-                                f"<span style='font-weight: 600; font-size: 14.5px; color: #0F172A;'>{prod_name}</span>"
-                                f"<span style='font-weight: 700; font-size: 14px; color: #334155;'>{score:.1f}%</span>"
-                                f"</div>"
-                                f"<div style='width: 100%; background-color: #E2E8F0; border-radius: 8px; height: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);'>"
-                                f"<div style='width: {min(score, 100)}%; background-color: {color}; height: 100%; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: width 0.8s ease-out;'></div>"
-                                f"</div>"
-                                f"</div>"
-                            )
-                        html_bars += "</div>"
-                        
-                        st.markdown(html_bars, unsafe_allow_html=True)
+                            # Format kode disatukan murni ke dalam 1 line (tanpa \n sama sekali)
+                            html_bar = f"<div style='margin-bottom: 22px; font-family: \"Inter\", \"Segoe UI\", sans-serif;'><div style='display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;'><span style='font-weight: 600; font-size: 14.5px; color: #0F172A;'>{prod_name}</span><span style='font-weight: 700; font-size: 14px; color: #334155;'>{score:.1f}%</span></div><div style='width: 100%; background-color: #E2E8F0; border-radius: 8px; height: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);'><div style='width: {min(score, 100)}%; background-color: {color}; height: 100%; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: width 0.8s ease-out;'></div></div></div>"
+                            st.markdown(html_bar, unsafe_allow_html=True)
                         
                     st.caption("Pengguna lebih mudah memahami hasil.")
                 else:
@@ -1088,7 +1062,6 @@ elif app_mode == "Analisis Batch Excel":
                     skor_num = row.get("Skor Risiko Numerik", 0)
                     
                     with st.expander(f"📦 {prod_name} — Klasifikasi: {klasifikasi} (Skor: {skor_num:.1f}%)"):
-                        # Proteksi KeyError: menggunakan dict get() untuk menghindari data session state lama yang usang
                         if 'nutrition_data' in row and isinstance(row['nutrition_data'], dict):
                             nut_data = row['nutrition_data']
                         else:
