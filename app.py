@@ -30,6 +30,11 @@ st.set_page_config(
 if "scan_history" not in st.session_state:
     st.session_state.scan_history = []
 
+# Tambahan state untuk menyimpan hasil batch agar tidak hilang saat download
+if "batch_result_df" not in st.session_state:
+    st.session_state.batch_result_df = None
+    st.session_state.batch_total_rows = 0
+
 
 @st.cache_resource(show_spinner=False)
 def load_all_models_and_scaler():
@@ -951,58 +956,88 @@ elif app_mode == "Analisis Batch Excel":
     st.write("Upload file Excel dengan kolom Nama Produk, Energi, Lemak, Lemak Jenuh, Karbohidrat, Gula, Protein, Garam, Natrium, Natrium Benzoat, dan Komposisi jika tersedia.")
 
     uploaded_file = st.file_uploader("Upload Excel", type=["xlsx"])
+    
     if uploaded_file is not None:
         df = pd.read_excel(uploaded_file)
-        df_clean = preprocess_batch_excel_data(df)
-        results = []
+        
+        # 1. Menampilkan preview dataframe input (Sesuai dengan gambar)
+        st.dataframe(df, use_container_width=True)
+        
+        # 2. Tombol untuk memulai proses Analisis Batch
+        if st.button("Mulai Analisis Batch", type="primary"):
+            df_clean = preprocess_batch_excel_data(df)
+            results = []
+            total_rows = len(df_clean)
+            
+            # 3. Menyiapkan visualisasi Progress Bar
+            progress_bar = st.progress(0)
+            
+            counter = 0
+            for idx, row in df_clean.iterrows():
+                nutrition_data = {
+                    "energi": row.get("Energi", 0),
+                    "lemak_total": row.get("Lemak", row.get("Lemak Total", 0)),
+                    "lemak_jenuh": row.get("Lemak Jenuh", 0),
+                    "protein": row.get("Protein", 0),
+                    "karbohidrat": row.get("Karbohidrat", 0),
+                    "gula": row.get("Gula", 0),
+                    "garam": row.get("Garam", 0),
+                    "natrium": row.get("Natrium", 0),
+                    "natrium_benzoat": row.get("Natrium Benzoat", 0),
+                }
+                komposisi = row.get("Komposisi", "")
+                
+                # Mendukung fallback jika kolom nama produk menggunakan header 'Kemasan' dari gambar Anda
+                product_name = str(row.get("Nama Produk", row.get("Produk", row.get("Kemasan", f"Produk {idx+1}"))))
 
-        for _, row in df_clean.iterrows():
-            nutrition_data = {
-                "energi": row.get("Energi", 0),
-                "lemak_total": row.get("Lemak", row.get("Lemak Total", 0)),
-                "lemak_jenuh": row.get("Lemak Jenuh", 0),
-                "protein": row.get("Protein", 0),
-                "karbohidrat": row.get("Karbohidrat", 0),
-                "gula": row.get("Gula", 0),
-                "garam": row.get("Garam", 0),
-                "natrium": row.get("Natrium", 0),
-                "natrium_benzoat": row.get("Natrium Benzoat", 0),
-            }
-            komposisi = row.get("Komposisi", "")
-            product_name = row.get("Nama Produk", row.get("Produk", "Produk Tanpa Nama"))
-
-            if not has_sufficient_input(nutrition_data):
-                results.append({
-                    "Nama Produk": product_name,
-                    "Skor Risiko": "Data belum cukup",
-                    "Klasifikasi": "Belum dianalisis",
-                    "Rekomendasi": "Isi nilai gizi yang valid sebelum analisis.",
-                })
-                continue
-
-            risk_score, _, recommendation = analyze_product_fully(
-                nutrition_data,
-                komposisi,
-                feat_model,
-                lgbm_model,
-                w2v_model,
-                scaler,
-            )
-            risk_info = classify_risk(risk_score)
-            results.append({
-                "Nama Produk": product_name,
-                "Skor Risiko": round(risk_score, 2),
-                "Klasifikasi": risk_info["label"],
-                "Rekomendasi": recommendation,
-            })
-
-        result_df = pd.DataFrame(results)
-        st.dataframe(result_df, use_container_width=True)
-
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            result_df.to_excel(writer, index=False, sheet_name="Hasil Analisis")
-        st.download_button("Download Hasil Excel", output.getvalue(), "hasil_analisis_nutriscan.xlsx")
+                if not has_sufficient_input(nutrition_data):
+                    results.append({
+                        "Nama Produk": product_name,
+                        "Skor Risiko": "Data belum cukup",
+                        "Klasifikasi": "Belum dianalisis",
+                        "Rekomendasi": "Isi nilai gizi yang valid sebelum analisis.",
+                    })
+                else:
+                    risk_score, _, recommendation = analyze_product_fully(
+                        nutrition_data,
+                        komposisi,
+                        feat_model,
+                        lgbm_model,
+                        w2v_model,
+                        scaler,
+                    )
+                    risk_info = classify_risk(risk_score)
+                    results.append({
+                        "Nama Produk": product_name,
+                        "Skor Risiko": round(risk_score, 2),
+                        "Klasifikasi": risk_info["label"],
+                        "Rekomendasi": recommendation,
+                    })
+                
+                # Update visualisasi Progress Bar
+                counter += 1
+                progress_bar.progress(counter / total_rows)
+            
+            # 4. Menyimpan hasil di Session State agar aman saat tombol download diklik
+            st.session_state.batch_result_df = pd.DataFrame(results)
+            st.session_state.batch_total_rows = total_rows
+            
+        # 5. Merender Hasil (Hanya jika state batch_result_df sudah tersimpan)
+        if st.session_state.batch_result_df is not None:
+            st.success(f"Analisis batch selesai untuk {st.session_state.batch_total_rows} produk!")
+            
+            st.header("Hasil Analisis Batch")
+            st.dataframe(st.session_state.batch_result_df, use_container_width=True)
+            
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                st.session_state.batch_result_df.to_excel(writer, index=False, sheet_name="Hasil Analisis")
+            
+            st.download_button("Download Hasil Excel", output.getvalue(), "hasil_analisis_nutriscan.xlsx")
+            
+    else:
+        # Bersihkan state hasil jika pengguna menghapus/close file Excel yang diupload
+        st.session_state.batch_result_df = None
 
 
 elif app_mode == "Riwayat Analisis":
