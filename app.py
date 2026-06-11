@@ -52,6 +52,25 @@ def get_ocr_reader_safely():
         return None, str(exc)
 
 
+def standardize_image_size(image, target_ratio=4/3):
+    """Menyamakan ukuran gambar dengan padding transparan agar seragam dan estetik."""
+    width, height = image.size
+    current_ratio = width / height
+
+    if current_ratio > target_ratio:
+        new_width = width
+        new_height = int(width / target_ratio)
+    else:
+        new_height = height
+        new_width = int(height * target_ratio)
+
+    # Buat kanvas kosong dengan background transparan
+    new_img = Image.new("RGBA", (new_width, new_height), (0, 0, 0, 0))
+    image = image.convert("RGBA")
+    new_img.paste(image, ((new_width - width) // 2, (new_height - height) // 2))
+    return new_img
+
+
 def safe_image(image, caption=None):
     try:
         st.image(image, caption=caption, use_container_width=True)
@@ -341,7 +360,6 @@ def render_xai_radar(xai_factors):
 def render_recommendation_details(risk_info, recommendation_text, is_upf, upf_flags):
     st.markdown("### Rekomendasi")
     
-    # Render kotak rekomendasi sesuai dengan style/tingkat risiko
     if risk_info["style"] == "success":
         st.info(f"{recommendation_text}")
     elif risk_info["style"] == "warning":
@@ -349,14 +367,12 @@ def render_recommendation_details(risk_info, recommendation_text, is_upf, upf_fl
     else:
         st.error(f"{recommendation_text}")
 
-    # Render peringatan bahan UPF jika ada
     if is_upf:
         st.error("Indikasi bahan ultra proses terdeteksi")
         st.write(", ".join(upf_flags))
         
     st.markdown("---")
     
-    # Penjelasan detail klasifikasi
     with st.expander("ℹ️ Detail Penjelasan Klasifikasi Nutrisi", expanded=False):
         st.markdown("""
         * 🟢 **Aman (0 - 34.99):** Produk relatif aman dan sehat. Cocok untuk dikonsumsi dalam porsi wajar sebagai bagian dari asupan nutrisi harian Anda.
@@ -408,7 +424,6 @@ def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
     st.write("")
     st.markdown("**Distribusi Sumber Kalori (Macronutrient Split)**")
 
-    # Hitung estimasi kalori dari makronutrien (Rule of thumb: L=9, K=4, P=4)
     kalori_lemak = lemak_total * 9
     kalori_karbo = karbohidrat * 4
     kalori_protein = protein * 4
@@ -417,7 +432,7 @@ def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
     if total_kal_makro > 0:
         labels = ['Lemak (9 kkal/g)', 'Karbohidrat (4 kkal/g)', 'Protein (4 kkal/g)']
         values = [kalori_lemak, kalori_karbo, kalori_protein]
-        colors = ['#E74C3C', '#2ECC71', '#3498DB']  # Merah, Hijau, Biru
+        colors = ['#E74C3C', '#2ECC71', '#3498DB'] 
 
         fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.5, marker=dict(colors=colors))])
         fig.update_traces(textinfo='percent+label', textposition='inside')
@@ -499,7 +514,8 @@ def build_analysis_result(product_name, takaran_saji, nutrition_data, komposisi)
     }
 
 
-def render_analysis_result(analysis_result, current_threshold, current_signature=None):
+def render_analysis_side(analysis_result, current_signature=None):
+    """Merender hasil analisis khusus untuk panel disamping (skor & radar)."""
     if not analysis_result:
         st.info("Hasil analisis akan muncul di sini setelah tombol analisis diklik.")
         return
@@ -514,20 +530,25 @@ def render_analysis_result(analysis_result, current_threshold, current_signature
         return
 
     risk_score = float(analysis_result.get("risk_score", 0))
-    risk_info = analysis_result.get("risk_info", classify_risk(risk_score))
     xai_factors = analysis_result.get("xai_factors", {})
+
+    render_risk_status(risk_score)
+    st.markdown("#### Radar Kontribusi Nutrisi")
+    render_xai_radar(xai_factors)
+
+
+def render_analysis_bottom(analysis_result, current_threshold):
+    """Merender rekomendasi & profil gizi di bagian bawah form secara penuh."""
+    if not analysis_result or analysis_result.get("status") == "insufficient":
+        return
+
+    risk_score = float(analysis_result.get("risk_score", 0))
+    risk_info = analysis_result.get("risk_info", classify_risk(risk_score))
     recommendation = analysis_result.get("recommendation", "")
     nutrition_data = analysis_result.get("nutrition_data", {})
     takaran_saji = analysis_result.get("takaran_saji", 0)
-    komposisi = analysis_result.get("komposisi", "")
-
-    # Tampilan Urutan Layout Baru
-    render_risk_status(risk_score)
     
-    st.markdown("#### Radar Kontribusi Nutrisi")
-    render_xai_radar(xai_factors)
-    
-    st.write("")
+    st.markdown("---")
     render_recommendation_details(risk_info, recommendation, analysis_result.get("is_upf"), analysis_result.get("upf_flags", []))
     
     st.markdown("---")
@@ -567,7 +588,8 @@ def run_product_analysis(product_name, takaran_saji, nutrition_data, komposisi, 
         target_key,
         input_signature=input_signature,
     )
-    render_analysis_result(analysis_result, current_threshold, current_signature=analysis_result["input_signature"])
+    render_analysis_side(analysis_result, current_signature=analysis_result["input_signature"])
+    render_analysis_bottom(analysis_result, current_threshold)
     return analysis_result
 
 def input_form(prefix, defaults):
@@ -716,7 +738,10 @@ if app_mode == "Analisis Produk Tunggal":
 
     with manual_result_col:
         st.subheader("Hasil Analisis AI (Prediksi Risiko)")
-        render_analysis_result(st.session_state.manual_analysis_result, current_threshold, current_signature=manual_signature)
+        render_analysis_side(st.session_state.manual_analysis_result, current_signature=manual_signature)
+
+    # Letakkan rekomendasi & profil gizi di luar kolom agar melebar penuh ke bawah
+    render_analysis_bottom(st.session_state.manual_analysis_result, current_threshold)
 
 
 elif app_mode == "Scan from Image":
@@ -738,8 +763,11 @@ elif app_mode == "Scan from Image":
 
         if img_file_1 is not None:
             try:
-                image_1 = Image.open(img_file_1)
-                safe_image(image_1, caption="Gambar nilai gizi")
+                # Gambar asli untuk mesin OCR
+                image_1_original = Image.open(img_file_1)
+                # Gambar yang diseragamkan hanya untuk tampilan UI (menghindari distorsi tampilan)
+                image_1_display = standardize_image_size(image_1_original, target_ratio=4/3)
+                safe_image(image_1_display, caption="Gambar nilai gizi")
 
                 if st.button("Proses OCR Nilai Gizi", key="btn_ocr_gizi"):
                     with st.spinner("Mempersiapkan OCR dan membaca nilai gizi secara bertahap..."):
@@ -747,7 +775,8 @@ elif app_mode == "Scan from Image":
                         if reader_error:
                             scan_result_1, ocr_error_1 = None, reader_error
                         else:
-                            scan_result_1, ocr_error_1 = run_ocr_safely(reader, image_1, mode="nutrition")
+                            # Proses OCR tetap memakai gambar asli
+                            scan_result_1, ocr_error_1 = run_ocr_safely(reader, image_1_original, mode="nutrition")
 
                     if ocr_error_1:
                         st.error("OCR nilai gizi gagal diproses. Aplikasi tidak dihentikan. Silakan input manual atau coba foto yang lebih jelas.")
@@ -779,8 +808,11 @@ elif app_mode == "Scan from Image":
 
         if img_file_2 is not None:
             try:
-                image_2 = Image.open(img_file_2)
-                safe_image(image_2, caption="Gambar komposisi")
+                # Gambar asli untuk mesin OCR
+                image_2_original = Image.open(img_file_2)
+                # Gambar yang diseragamkan hanya untuk tampilan UI (menghindari distorsi tampilan)
+                image_2_display = standardize_image_size(image_2_original, target_ratio=4/3)
+                safe_image(image_2_display, caption="Gambar komposisi")
 
                 if st.button("Proses OCR Komposisi", key="btn_ocr_komposisi"):
                     with st.spinner("Mempersiapkan OCR dan membaca komposisi secara bertahap..."):
@@ -788,7 +820,8 @@ elif app_mode == "Scan from Image":
                         if reader_error:
                             scan_result_2, ocr_error_2 = None, reader_error
                         else:
-                            scan_result_2, ocr_error_2 = run_ocr_safely(reader, image_2, mode="composition")
+                            # Proses OCR tetap memakai gambar asli
+                            scan_result_2, ocr_error_2 = run_ocr_safely(reader, image_2_original, mode="composition")
 
                     if ocr_error_2:
                         st.error("OCR komposisi gagal diproses. Aplikasi tidak dihentikan. Silakan input manual atau coba foto yang lebih jelas.")
@@ -832,7 +865,10 @@ elif app_mode == "Scan from Image":
 
     with result_col:
         st.subheader("Hasil Analisis AI (Prediksi Risiko)")
-        render_analysis_result(st.session_state.ocr_analysis_result, current_threshold, current_signature=ocr_signature)
+        render_analysis_side(st.session_state.ocr_analysis_result, current_signature=ocr_signature)
+        
+    # Letakkan rekomendasi & profil gizi di luar kolom agar melebar penuh ke bawah
+    render_analysis_bottom(st.session_state.ocr_analysis_result, current_threshold)
 
 
 elif app_mode == "Analisis Batch Excel":
