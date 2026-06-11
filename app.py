@@ -429,7 +429,8 @@ def render_xai_radar(xai_factors):
 
 
 def render_recommendation_details(risk_info, recommendation_text, is_upf, upf_flags):
-    st.markdown("### Rekomendasi")
+    # PERUBAHAN 4: Rekomendasi
+    st.markdown("<h2 style='font-weight: 800; font-size: 1.6rem; color: #2C3E50;'>Rekomendasi</h2>", unsafe_allow_html=True)
     
     if risk_info["style"] == "success":
         st.info(f"{recommendation_text}")
@@ -457,7 +458,8 @@ def render_recommendation_details(risk_info, recommendation_text, is_upf, upf_fl
 
 
 def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
-    st.markdown("### 📊 Profil Gizi & Makronutrien Holistik")
+    # PERUBAHAN 5: Profil Gizi & Makronutrien Holistik
+    st.markdown("<h2 style='font-weight: 800; font-size: 1.6rem; color: #2C3E50;'>📊 Profil Gizi & Makronutrien Holistik</h2>", unsafe_allow_html=True)
     render_custom_caption("Analisis mendalam mengenai sumber kalori dan dampak glikemik berdasarkan takaran saji.")
 
     energi = float(nutrition_data.get("energi", 0))
@@ -472,7 +474,8 @@ def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("**Kepadatan Energi (kkal/gram)**")
+        # PERUBAHAN 6: Kepadatan Energi (kkal/gram)
+        st.markdown("<div style='font-size: 1.25rem; font-weight: 800; color: #1E3A8A; margin-bottom: 5px;'>Kepadatan Energi (kkal/gram)</div>", unsafe_allow_html=True)
         st.markdown(f"## {kepadatan:.1f}")
         if kepadatan > 4.0:
             st.error("↑ 🔴 Sangat Tinggi (Padat Kalori)")
@@ -485,7 +488,8 @@ def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
             render_custom_caption("Produk ini memiliki kepadatan energi yang rendah, baik untuk mengontrol asupan kalori.")
 
     with col2:
-        st.markdown("**Rasio Gula dari Total Karbohidrat**")
+        # PERUBAHAN 7: Rasio Gula dari Total Karbohidrat
+        st.markdown("<div style='font-size: 1.25rem; font-weight: 800; color: #1E3A8A; margin-bottom: 5px;'>Rasio Gula dari Total Karbohidrat</div>", unsafe_allow_html=True)
         st.markdown(f"## {rasio_gula:.1f}%")
         if rasio_gula > 50:
             st.error("↑ 🔴 Tinggi Gula Sederhana")
@@ -547,7 +551,8 @@ def custom_progress_bar(label, current_val, max_val, unit, color, percentage):
 
 
 def render_health_metrics(nutrition_data, takaran_saji, current_threshold):
-    st.markdown("### 🎯 Pemenuhan Angka Kecukupan Gizi Harian")
+    # PERUBAHAN 8: Pemenuhan Angka Kecukupan Gizi Harian
+    st.markdown("<h2 style='font-weight: 800; font-size: 1.6rem; color: #2C3E50;'>🎯 Pemenuhan Angka Kecukupan Gizi Harian</h2>", unsafe_allow_html=True)
     render_custom_caption("Berdasarkan profil pengguna dan batas ambang kesehatan medis Anda:")
     st.write("")
 
@@ -814,12 +819,14 @@ else:
 
 
 if app_mode == "Analisis Produk Tunggal":
-    st.header("Analisis Produk Tunggal")
+    # PERUBAHAN 1: Analisis Produk Tunggal
+    st.markdown("<h1 style='font-weight: 800; font-size: 2.2rem; color: #1E3A8A; margin-bottom: 20px;'>Analisis Produk Tunggal</h1>", unsafe_allow_html=True)
 
     manual_input_col, manual_result_col = st.columns([1.15, 1], gap="large")
 
     with manual_input_col:
-        st.subheader("Input Informasi Produk")
+        # PERUBAHAN 2: Input Informasi Produk
+        st.markdown("<h2 style='font-weight: 700; font-size: 1.5rem; color: #2C3E50; margin-bottom: 15px;'>Input Informasi Produk</h2>", unsafe_allow_html=True)
         
         # Inisialisasi dropdown state dengan opsi Kosong
         if "preset_selector" not in st.session_state:
@@ -848,7 +855,8 @@ if app_mode == "Analisis Produk Tunggal":
             st.success("Analisis berhasil diperbarui. Hasil ditampilkan di panel kanan.")
 
     with manual_result_col:
-        st.subheader("Hasil Analisis AI (Prediksi Risiko)")
+        # PERUBAHAN 3: Hasil Analisis AI (Prediksi Risiko)
+        st.markdown("<h2 style='font-weight: 700; font-size: 1.5rem; color: #2C3E50; margin-bottom: 15px;'>Hasil Analisis AI (Prediksi Risiko)</h2>", unsafe_allow_html=True)
         render_analysis_side(st.session_state.manual_analysis_result, current_signature=manual_signature)
 
     # Letakkan rekomendasi & profil gizi di luar kolom agar melebar penuh ke bawah
@@ -975,7 +983,8 @@ elif app_mode == "Scan from Image":
             st.success("Analisis berhasil diperbarui. Hasil ditampilkan di panel kanan.")
 
     with result_col:
-        st.subheader("Hasil Analisis AI (Prediksi Risiko)")
+        # PERUBAHAN 3: Hasil Analisis AI (Prediksi Risiko) (di bagian OCR)
+        st.markdown("<h2 style='font-weight: 700; font-size: 1.5rem; color: #2C3E50; margin-bottom: 15px;'>Hasil Analisis AI (Prediksi Risiko)</h2>", unsafe_allow_html=True)
         render_analysis_side(st.session_state.ocr_analysis_result, current_signature=ocr_signature)
         
     # Letakkan rekomendasi & profil gizi di luar kolom agar melebar penuh ke bawah
