@@ -614,6 +614,6 @@ def _build_recommendation(
         notes.append("Komposisi menunjukkan indikasi bahan ultra proses: " + ", ".join(upf_flags) + ".")
 
     if used_rule_guard:
-        notes.append("Catatan sistem: skor akhir dijaga dengan aturan gizi terkalibrasi agar hasil Aman, Sedang, dan Tinggi tetap konsisten.")
+        notes.append("")
 
     return " ".join(notes)
