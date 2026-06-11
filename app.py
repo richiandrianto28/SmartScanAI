@@ -1025,8 +1025,8 @@ elif app_mode == "Analisis Batch Excel":
                 if not valid_df.empty:
                     col_chart1, col_chart2 = st.columns(2, gap="large")
                     
-                    # Pemetaan warna yang seragam untuk chart
-                    color_map = {"Aman": "#2ECC71", "Sedang": "#F39C12", "Tinggi": "#E74C3C"}
+                    # Pemetaan warna yang seragam untuk chart klasifikasi harian
+                    classification_colors = {"Aman": "#2ECC71", "Sedang": "#F39C12", "Tinggi": "#E74C3C"}
 
                     # === PIE CHART ===
                     with col_chart1:
@@ -1036,7 +1036,7 @@ elif app_mode == "Analisis Batch Excel":
                         pie_data = valid_df["Klasifikasi"].value_counts().reset_index()
                         pie_data.columns = ["Klasifikasi", "Jumlah"]
                         
-                        pie_colors = [color_map.get(c, "#95A5A6") for c in pie_data["Klasifikasi"]]
+                        pie_colors = [classification_colors.get(c, "#95A5A6") for c in pie_data["Klasifikasi"]]
                         
                         fig_pie = go.Figure(data=[go.Pie(
                             labels=pie_data["Klasifikasi"], 
@@ -1048,33 +1048,56 @@ elif app_mode == "Analisis Batch Excel":
                         fig_pie.update_layout(showlegend=False, margin=dict(t=20, b=20, l=20, r=20), height=400)
                         st.plotly_chart(fig_pie, use_container_width=True)
 
-                    # === BAR CHART ===
+                    # === BAR CHART (DIKOREKSI: MODERN, ELEGAN, DAN BERWARNA-WARNI SEPERTI IMAGE_DACA05.PNG) ===
                     with col_chart2:
                         st.markdown("**Bar Chart**")
                         st.write("Menampilkan:\nProduk vs Skor Risiko")
                         
-                        # Sort data agar nilai terbesar atau terkecil terurut rapi
+                        # Mengurutkan data produk berdasarkan tingkat risiko agar visualisasi seimbang
                         bar_data = valid_df.sort_values(by="Skor Risiko Numerik", ascending=True)
-                        bar_colors = [color_map.get(c, "#3498DB") for c in bar_data["Klasifikasi"]]
+                        
+                        # Palet warna UI modern & variatif (setiap bar mendapatkan warna berbeda sesuai urutannya)
+                        modern_palette = [
+                            "#F39C12", "#3498DB", "#9B59B6", "#E67E22", "#2ECC71",
+                            "#1ABC9C", "#E74C3C", "#FF6B6B", "#48DBFB", "#10AC84",
+                            "#5F27CD", "#00D2D3", "#54A0FF", "#2C3E50", "#6C5CE7"
+                        ]
+                        bar_colors = [modern_palette[i % len(modern_palette)] for i in range(len(bar_data))]
 
                         fig_bar = go.Figure(go.Bar(
                             x=bar_data["Skor Risiko Numerik"],
                             y=bar_data["Nama Produk"],
                             orientation='h',
-                            text=bar_data["Skor Risiko Numerik"].apply(lambda x: f"{x:.0f}"),
+                            # Menampilkan nilai skor risiko tepat di luar ujung bar secara tebal (bold)
+                            text=bar_data["Skor Risiko Numerik"].apply(lambda x: f"  <b>{x:.1f}%</b>"),
                             textposition='outside',
-                            marker=dict(color=bar_colors)
+                            marker=dict(
+                                color=bar_colors,
+                                cornerradius=15  # Membuat efek lengkung kapsul (rounded capsule) modern mirip image_daca05.png
+                            ),
+                            hovertemplate="<b>%{y}</b><br>Skor Risiko: %{x:.2f}%<extra></extra>"
                         ))
                         
-                        # Set height dinamis agar batang grafik tidak berdesakan jika datanya banyak (misal: 20 produk)
-                        dynamic_height = max(400, len(bar_data) * 35)
+                        # Menghitung tinggi grafik secara dinamis agar produk batch tidak menumpuk berdesakan
+                        dynamic_height = max(400, len(bar_data) * 45)
                         
                         fig_bar.update_layout(
-                            margin=dict(t=20, b=20, l=20, r=20), 
+                            margin=dict(t=40, b=40, l=20, r=70), 
                             height=dynamic_height,
-                            xaxis_title="Skor Risiko",
-                            yaxis_title="",
-                            font=dict(size=14)
+                            xaxis=dict(
+                                title="Skor Risiko (%)",
+                                range=[0, 115], # Beri ruang ekstra untuk teks persentase skor agar tidak terpotong
+                                gridcolor="rgba(226, 232, 240, 0.4)", # Garis penanda grid yang tipis dan bersih
+                                showgrid=True
+                            ),
+                            yaxis=dict(
+                                tickfont=dict(weight="bold"),
+                                showgrid=False
+                            ),
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            plot_bgcolor="rgba(248, 250, 252, 0.6)", # Background penahan (track canvas) bernuansa bersih
+                            font=dict(size=14, family="'Inter', sans-serif"),
+                            bargap=0.35 # Spasi antar bar dioptimalkan agar serupa dengan kontainer image_daca05.png
                         )
                         st.plotly_chart(fig_bar, use_container_width=True)
                         
