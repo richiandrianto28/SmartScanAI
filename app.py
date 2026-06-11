@@ -484,7 +484,6 @@ def custom_progress_bar(label, current_val, max_val, unit, color, percentage):
         color = "#E74C3C" 
         warning_text = "<span style='color:#E74C3C; font-weight:bold; font-size: 0.9em; margin-left: 5px;'>(Melebihi Batas!)</span>"
 
-    # Penulisan string disatukan untuk memastikan tidak ada kesalahan rendering markdown code block
     html_code = f"<div style='margin-bottom: 24px; font-family: \"Inter\", \"Segoe UI\", sans-serif;'><div style='display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;'><span style='font-weight: 600; font-size: 15px; color: #0F172A;'>{label}</span><span style='color: #475569; font-size: 14px;'><span style='font-weight: 700; color: #1E293B;'>{current_val:.2f}</span> / {max_val:.2f} {unit} <span style='color: #64748B; margin-left: 4px;'>({percentage:.1f}%)</span>{warning_text}</span></div><div style='width: 100%; background-color: #E2E8F0; border-radius: 8px; height: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);'><div style='width: {display_pct}%; background-color: {color}; height: 100%; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: width 0.8s ease-out;'></div></div></div>"
     st.markdown(html_code, unsafe_allow_html=True)
 
@@ -1003,52 +1002,61 @@ elif app_mode == "Analisis Batch Excel":
                 valid_df = df_results.dropna(subset=["Skor Risiko Numerik"])
 
                 if not valid_df.empty:
-                    col_chart1, col_chart2 = st.columns(2, gap="large")
-                    
                     classification_colors = {"Aman": "#2ECC71", "Sedang": "#F39C12", "Tinggi": "#E74C3C"}
 
-                    with col_chart1:
-                        st.markdown("**Pie Chart**")
-                        st.write("Menunjukkan persentase:\n* Aman\n* Sedang\n* Tinggi")
-                        
-                        pie_data = valid_df["Klasifikasi"].value_counts().reset_index()
-                        pie_data.columns = ["Klasifikasi", "Jumlah"]
-                        
-                        pie_colors = [classification_colors.get(c, "#95A5A6") for c in pie_data["Klasifikasi"]]
-                        
-                        fig_pie = go.Figure(data=[go.Pie(
-                            labels=pie_data["Klasifikasi"], 
-                            values=pie_data["Jumlah"], 
-                            hole=0.4,
-                            marker=dict(colors=pie_colors)
-                        )])
-                        fig_pie.update_traces(textinfo='percent+label', textfont_size=14)
-                        fig_pie.update_layout(showlegend=False, margin=dict(t=20, b=20, l=20, r=20), height=400)
-                        st.plotly_chart(fig_pie, use_container_width=True)
+                    # === PIE CHART DITAMPILKAN DI ATAS, DIPERBAIKI TATA LETAKNYA ===
+                    st.markdown("#### Proporsi Klasifikasi Produk")
+                    st.write("Menunjukkan persentase produk dalam kategori Aman, Sedang, dan Tinggi.")
+                    
+                    pie_data = valid_df["Klasifikasi"].value_counts().reset_index()
+                    pie_data.columns = ["Klasifikasi", "Jumlah"]
+                    pie_colors = [classification_colors.get(c, "#95A5A6") for c in pie_data["Klasifikasi"]]
+                    
+                    fig_pie = go.Figure(data=[go.Pie(
+                        labels=pie_data["Klasifikasi"], 
+                        values=pie_data["Jumlah"], 
+                        hole=0.4,
+                        marker=dict(colors=pie_colors),
+                        hoverinfo='label+percent+value',
+                        textinfo='percent+label',
+                        textfont_size=15
+                    )])
+                    
+                    # Memperbaiki legenda agar ada di bawah (horizontal) dan grafik terlihat balance
+                    fig_pie.update_layout(
+                        showlegend=True, 
+                        legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
+                        margin=dict(t=30, b=40, l=20, r=20), 
+                        height=450
+                    )
+                    st.plotly_chart(fig_pie, use_container_width=True)
 
-                    with col_chart2:
-                        st.markdown("**Bar Chart (Skor Risiko)**")
-                        st.write("Menampilkan tingkat risiko dari tiap produk:")
-                        
-                        bar_data = valid_df.sort_values(by="Skor Risiko Numerik", ascending=False)
-                        
-                        modern_palette = [
-                            "#F59E0B", "#3B82F6", "#8B5CF6", "#10B981", "#EF4444", 
-                            "#06B6D4", "#F97316", "#EC4899", "#84CC16", "#14B8A6",
-                            "#6366F1", "#F43F5E", "#0EA5E9", "#10B981", "#8B5CF6"
-                        ]
+                    st.markdown("<hr style='border:1px dashed #E2E8F0; margin: 30px 0;'>", unsafe_allow_html=True)
 
-                        st.markdown("<div style='margin-top: 16px;'></div>", unsafe_allow_html=True)
-                        for i, (_, row_data) in enumerate(bar_data.iterrows()):
-                            prod_name = row_data["Nama Produk"]
-                            score = float(row_data["Skor Risiko Numerik"])
-                            color = modern_palette[i % len(modern_palette)]
-                            
-                            # Format kode disatukan murni ke dalam 1 line (tanpa \n sama sekali)
-                            html_bar = f"<div style='margin-bottom: 22px; font-family: \"Inter\", \"Segoe UI\", sans-serif;'><div style='display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;'><span style='font-weight: 600; font-size: 14.5px; color: #0F172A;'>{prod_name}</span><span style='font-weight: 700; font-size: 14px; color: #334155;'>{score:.1f}%</span></div><div style='width: 100%; background-color: #E2E8F0; border-radius: 8px; height: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);'><div style='width: {min(score, 100)}%; background-color: {color}; height: 100%; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: width 0.8s ease-out;'></div></div></div>"
-                            st.markdown(html_bar, unsafe_allow_html=True)
-                        
+                    # === BAR CHART HTML DITAMPILKAN DI BAWAH PIE CHART ===
+                    st.markdown("#### Peringkat Skor Risiko Produk")
+                    st.write("Menampilkan tingkat risiko dari tiap produk secara spesifik:")
+                    
+                    bar_data = valid_df.sort_values(by="Skor Risiko Numerik", ascending=False)
+                    
+                    modern_palette = [
+                        "#F59E0B", "#3B82F6", "#8B5CF6", "#10B981", "#EF4444", 
+                        "#06B6D4", "#F97316", "#EC4899", "#84CC16", "#14B8A6",
+                        "#6366F1", "#F43F5E", "#0EA5E9", "#10B981", "#8B5CF6"
+                    ]
+
+                    # HTML disatukan seluruhnya ke dalam satu baris (inline) untuk 100% mencegah error Markdown code-block Streamlit
+                    html_bars = "<div style='margin-top: 16px;'>"
+                    for i, (_, row_data) in enumerate(bar_data.iterrows()):
+                        prod_name = row_data["Nama Produk"]
+                        score = float(row_data["Skor Risiko Numerik"])
+                        color = modern_palette[i % len(modern_palette)]
+                        html_bars += f"<div style='margin-bottom: 22px; font-family: \"Inter\", \"Segoe UI\", sans-serif;'><div style='display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;'><span style='font-weight: 600; font-size: 14.5px; color: #0F172A;'>{prod_name}</span><span style='font-weight: 700; font-size: 14px; color: #334155;'>{score:.1f}%</span></div><div style='width: 100%; background-color: #E2E8F0; border-radius: 8px; height: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);'><div style='width: {min(score, 100)}%; background-color: {color}; height: 100%; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: width 0.8s ease-out;'></div></div></div>"
+                    html_bars += "</div>"
+                    
+                    st.markdown(html_bars, unsafe_allow_html=True)
                     st.caption("Pengguna lebih mudah memahami hasil.")
+                    
                 else:
                     st.info("Tidak ada data valid yang bisa divisualisasikan dalam grafik.")
                     
