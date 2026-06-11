@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import io
+import os
+import tempfile
 from datetime import datetime
 
 import easyocr
@@ -291,15 +293,7 @@ def hitung_tdee_dinamis(gender, usia, berat, tinggi, aktivitas):
 
 
 def build_nutrition_data(
-    energi,
-    lemak_total,
-    lemak_jenuh,
-    protein,
-    karbohidrat,
-    gula,
-    garam,
-    natrium,
-    natrium_benzoat,
+    energi, lemak_total, lemak_jenuh, protein, karbohidrat, gula, garam, natrium, natrium_benzoat
 ):
     return {
         "energi": float(energi),
@@ -590,7 +584,6 @@ def generate_batch_insights(df_results):
         nut_data = highest_risk_row["nutrition_data"]
         high_factors = []
         
-        # Heuristik sederhana untuk menyimpulkan penyebab skor tinggi (bisa disesuaikan batasnya)
         if float(nut_data.get("natrium", 0)) > 300: high_factors.append("natrium")
         if float(nut_data.get("gula", 0)) > 12: high_factors.append("gula")
         if float(nut_data.get("lemak_total", 0)) > 10: high_factors.append("lemak")
@@ -610,6 +603,124 @@ def generate_batch_insights(df_results):
         f"tingkat risiko konsumsi berada pada kategori **{avg_cat}**."
     )
     return insight
+
+
+# FITUR BARU: Generate Report ke format PDF Profesional
+def generate_pdf_report(df_results, insight_text, fig_pie):
+    from fpdf import FPDF
+    
+    class PDFReport(FPDF):
+        def header(self):
+            self.set_font('Arial', 'B', 16)
+            self.set_text_color(15, 23, 42)
+            self.cell(0, 10, 'Laporan Analisis Batch - SMART NutriScan AI', 0, 1, 'C')
+            self.set_draw_color(200, 200, 200)
+            self.line(10, 22, 200, 22)
+            self.ln(10)
+            
+        def footer(self):
+            self.set_y(-15)
+            self.set_font('Arial', 'I', 8)
+            self.set_text_color(100, 100, 100)
+            self.cell(0, 10, f'Halaman {self.page_no()}', 0, 0, 'C')
+
+    pdf = PDFReport()
+    pdf.add_page()
+    
+    # 1. Ringkasan Eksekutif
+    pdf.set_font("Arial", 'B', 12)
+    pdf.set_text_color(30, 41, 59)
+    pdf.cell(0, 10, "1. Ringkasan Eksekutif", 0, 1)
+    
+    pdf.set_font("Arial", '', 11)
+    pdf.set_text_color(50, 50, 50)
+    clean_insight = insight_text.replace('**', '').replace('\n', ' ')
+    clean_insight = clean_insight.encode('latin-1', 'replace').decode('latin-1')
+    pdf.multi_cell(0, 7, clean_insight)
+    pdf.ln(5)
+    
+    # 2. Statistik
+    pdf.set_font("Arial", 'B', 12)
+    pdf.set_text_color(30, 41, 59)
+    pdf.cell(0, 10, "2. Statistik Distribusi Risiko", 0, 1)
+    
+    valid_df = df_results.dropna(subset=["Skor Risiko Numerik"])
+    total = len(valid_df)
+    
+    if total > 0:
+        aman = len(valid_df[valid_df["Klasifikasi"] == "Aman"])
+        sedang = len(valid_df[valid_df["Klasifikasi"] == "Sedang"])
+        tinggi = len(valid_df[valid_df["Klasifikasi"] == "Tinggi"])
+        avg_score = valid_df["Skor Risiko Numerik"].mean()
+        
+        pdf.set_font("Arial", '', 11)
+        pdf.set_text_color(50, 50, 50)
+        stats_text = (
+            f"- Total Produk Dianalisis: {total} produk\n"
+            f"- Kategori Aman: {aman} produk ({(aman/total)*100:.1f}%)\n"
+            f"- Kategori Sedang: {sedang} produk ({(sedang/total)*100:.1f}%)\n"
+            f"- Kategori Tinggi: {tinggi} produk ({(tinggi/total)*100:.1f}%)\n"
+            f"- Rata-rata Skor Risiko Keseluruhan: {avg_score:.2f} / 100"
+        )
+        pdf.multi_cell(0, 7, stats_text)
+    pdf.ln(5)
+    
+    # 3. Grafik Proporsi Klasifikasi
+    pdf.set_font("Arial", 'B', 12)
+    pdf.set_text_color(30, 41, 59)
+    pdf.cell(0, 10, "3. Grafik Proporsi Klasifikasi", 0, 1)
+    
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmpfile:
+            fig_pie.write_image(tmpfile.name, format="png", width=600, height=400)
+            pdf.image(tmpfile.name, x=45, w=120)
+        os.unlink(tmpfile.name)
+        pdf.ln(5)
+    except Exception as e:
+        pdf.set_font("Arial", 'I', 10)
+        pdf.set_text_color(200, 50, 50)
+        pdf.cell(0, 10, "(Grafik tidak dapat diekspor. Pastikan package 'kaleido' terinstall di backend.)", 0, 1)
+        pdf.ln(5)
+        
+    # 4. Tabel Hasil Analisis
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 12)
+    pdf.set_text_color(30, 41, 59)
+    pdf.cell(0, 10, "4. Detail Tabel Hasil Analisis", 0, 1)
+    pdf.ln(2)
+    
+    # Table Header
+    pdf.set_font("Arial", 'B', 10)
+    pdf.set_fill_color(240, 244, 248)
+    col_w = [110, 35, 45]
+    pdf.cell(col_w[0], 10, "Nama Produk", 1, 0, 'C', fill=True)
+    pdf.cell(col_w[1], 10, "Skor Risiko", 1, 0, 'C', fill=True)
+    pdf.cell(col_w[2], 10, "Klasifikasi", 1, 1, 'C', fill=True)
+    
+    # Table Content
+    pdf.set_font("Arial", '', 10)
+    pdf.set_text_color(0, 0, 0)
+    
+    for _, row in valid_df.sort_values(by="Skor Risiko Numerik", ascending=False).iterrows():
+        name = str(row['Nama Produk']).strip()
+        if len(name) > 55: name = name[:52] + "..."
+        skor = f"{row['Skor Risiko Numerik']:.2f}%"
+        klas = str(row['Klasifikasi'])
+        
+        name = name.encode('latin-1', 'replace').decode('latin-1')
+        
+        pdf.cell(col_w[0], 10, f" {name}", 1, 0, 'L')
+        pdf.cell(col_w[1], 10, skor, 1, 0, 'C')
+        pdf.cell(col_w[2], 10, klas, 1, 1, 'C')
+
+    # Convert PDF object to Bytes safely
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmpdf:
+        pdf.output(tmpdf.name)
+        with open(tmpdf.name, 'rb') as f:
+            pdf_bytes = f.read()
+    os.unlink(tmpdf.name)
+    
+    return pdf_bytes
 
 
 def render_analysis_side(analysis_result, current_signature=None):
@@ -677,12 +788,7 @@ def store_product_analysis_result(product_name, takaran_saji, nutrition_data, ko
 def run_product_analysis(product_name, takaran_saji, nutrition_data, komposisi, current_threshold, store_key=None, input_signature=None):
     target_key = store_key or "manual_analysis_result"
     analysis_result = store_product_analysis_result(
-        product_name,
-        takaran_saji,
-        nutrition_data,
-        komposisi,
-        target_key,
-        input_signature=input_signature,
+        product_name, takaran_saji, nutrition_data, komposisi, target_key, input_signature=input_signature,
     )
     render_analysis_side(analysis_result, current_signature=analysis_result["input_signature"])
     render_analysis_bottom(analysis_result, current_threshold)
@@ -737,15 +843,7 @@ def input_form(prefix, defaults):
     komposisi = st.text_area("Komposisi", height=120, key=komposisi_key)
 
     nutrition_data = build_nutrition_data(
-        energi,
-        lemak_total,
-        lemak_jenuh,
-        protein,
-        karbohidrat,
-        gula,
-        garam,
-        natrium,
-        natrium_benzoat,
+        energi, lemak_total, lemak_jenuh, protein, karbohidrat, gula, garam, natrium, natrium_benzoat
     )
 
     return product_name, takaran_saji, nutrition_data, komposisi
@@ -1063,10 +1161,12 @@ elif app_mode == "Analisis Batch Excel":
                 df_results["Skor Risiko Numerik"] = pd.to_numeric(df_results["Skor Risiko"], errors='coerce')
                 valid_df = df_results.dropna(subset=["Skor Risiko Numerik"])
 
+                fig_pie = None
+
                 if not valid_df.empty:
                     classification_colors = {"Aman": "#2ECC71", "Sedang": "#F39C12", "Tinggi": "#E74C3C"}
 
-                    # === PIE CHART DITAMPILKAN DI ATAS DENGAN LEBAR PENUH ===
+                    # === PIE CHART ===
                     st.markdown("#### Proporsi Klasifikasi Produk")
                     st.write("Menunjukkan persentase produk dalam kategori Aman, Sedang, dan Tinggi.")
                     
@@ -1084,7 +1184,6 @@ elif app_mode == "Analisis Batch Excel":
                         textfont_size=15
                     )])
                     
-                    # Layout dipusatkan dengan height proporsional agar tidak terlalu memakan tempat secara vertikal
                     fig_pie.update_layout(
                         showlegend=True, 
                         legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
@@ -1095,7 +1194,7 @@ elif app_mode == "Analisis Batch Excel":
 
                     st.markdown("<hr style='border:1px dashed #E2E8F0; margin: 30px 0;'>", unsafe_allow_html=True)
 
-                    # === BAR CHART HTML DITAMPILKAN DI BAWAH PIE CHART ===
+                    # === BAR CHART HTML ===
                     st.markdown("#### Peringkat Skor Risiko Produk")
                     st.write("Menampilkan tingkat risiko dari tiap produk secara spesifik:")
                     
@@ -1107,7 +1206,6 @@ elif app_mode == "Analisis Batch Excel":
                         "#6366F1", "#F43F5E", "#0EA5E9", "#10B981", "#8B5CF6"
                     ]
 
-                    # HTML dirender langsung menjadi string panjang
                     html_bars = "<div style='margin-top: 16px;'>"
                     for i, (_, row_data) in enumerate(bar_data.iterrows()):
                         prod_name = row_data["Nama Produk"]
@@ -1138,19 +1236,49 @@ elif app_mode == "Analisis Batch Excel":
                             nut_data = {"gula": 0, "natrium": 0, "lemak_jenuh": 0}
                             
                         t_saji = row['takaran_saji'] if 'takaran_saji' in row else 100.0
-                        
                         render_health_metrics(nut_data, t_saji, current_threshold, show_header=False)
                 
             except Exception as e:
                 st.error(f"Terjadi masalah saat merender visualisasi batch: {e}")
-            
+
+            # --- FITUR BARU: DOWNLOAD EXCEL DAN PDF ---
+            st.markdown("---")
+            st.markdown("### 📥 Export Hasil Analisis")
+
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
                 df_to_excel = st.session_state.batch_result_df[display_cols]
                 df_to_excel.to_excel(writer, index=False, sheet_name="Hasil Analisis")
+
+            col_dl1, col_dl2 = st.columns(2)
             
-            st.markdown("---")
-            st.download_button("Download Hasil Excel", output.getvalue(), "hasil_analisis_nutriscan.xlsx")
+            with col_dl1:
+                st.download_button(
+                    label="📊 Download Hasil Excel", 
+                    data=output.getvalue(), 
+                    file_name="hasil_analisis_nutriscan.xlsx",
+                    use_container_width=True
+                )
+                
+            with col_dl2:
+                try:
+                    from fpdf import FPDF
+                    pdf_ready = True
+                except ImportError:
+                    pdf_ready = False
+                    
+                if pdf_ready:
+                    with st.spinner("Menyiapkan dokumen PDF Profesional..."):
+                        pdf_data = generate_pdf_report(df_results, insight_text, fig_pie)
+                        st.download_button(
+                            label="📑 Download PDF Report", 
+                            data=pdf_data, 
+                            file_name="Laporan_Analisis_NutriScan.pdf", 
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
+                else:
+                    st.warning("⚠️ Modul 'fpdf' belum terinstall. Jalankan `pip install fpdf kaleido` di terminal agar tombol Export PDF muncul.")
             
     else:
         st.session_state.batch_result_df = None
