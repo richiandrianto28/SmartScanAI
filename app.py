@@ -74,11 +74,18 @@ def standardize_image_size(image, target_ratio=4/3):
     return new_img
 
 
-def safe_image(image, caption=None):
+# Update: Penyesuaian batas lebar gambar agar seragam dan tidak terlalu besar
+def safe_image(image, caption=None, width=None):
     try:
-        st.image(image, caption=caption, use_container_width=True)
+        if width:
+            st.image(image, caption=caption, width=width)
+        else:
+            st.image(image, caption=caption, use_container_width=True)
     except TypeError:
-        st.image(image, caption=caption, use_column_width=True)
+        if width:
+            st.image(image, caption=caption, width=width)
+        else:
+            st.image(image, caption=caption, use_column_width=True)
 
 
 def fmt(value, digits=2, suffix=""):
@@ -886,14 +893,13 @@ with st.sidebar:
         st.write(f"Lemak jenuh: {current_threshold['lemak_jenuh']:.2f} g")
         st.write(f"Natrium: {current_threshold['natrium']:.2f} mg")
 
-    # ---> FITUR BARU: Menambahkan opsi Perbandingan Produk ke Sidebar
     app_mode = st.radio(
         "Pilih Fitur",
         [
             "Analisis Produk Tunggal",
-            "Perbandingan Produk",
             "Scan from Image",
             "Analisis Batch Excel",
+            "Perbandingan Produk",  
             "Riwayat Analisis",
             "Edukasi Gizi",
         ],
@@ -949,77 +955,6 @@ if app_mode == "Analisis Produk Tunggal":
     render_analysis_bottom(st.session_state.manual_analysis_result, current_threshold)
 
 
-# ================= FITUR BARU: PERBANDINGAN PRODUK =================
-elif app_mode == "Perbandingan Produk":
-    st.header("Perbandingan Produk (Food Comparison Mode)")
-    st.info("Bandingkan metrik AI (Skor Risiko) dan metrik BI (Kepadatan Energi) dari dua produk sekaligus.")
-
-    colA, colB = st.columns(2, gap="large")
-
-    with colA:
-        st.subheader("Produk A")
-        method_a = st.radio("Metode Input Produk A:", ["Input Manual", "Scan dengan Kamera"], key="method_a")
-        if method_a == "Scan dengan Kamera":
-            st.warning("Integrasi kamera langsung dalam mode perbandingan sedang dalam pengembangan tahap lanjut. Silakan gunakan tab 'Scan from Image' di sidebar untuk OCR, atau gunakan **Input Manual** di bawah ini.")
-        
-        prod_name_a, saji_a, nut_a, kompo_a = input_form("comp_a", EXAMPLE_PRESETS["Kosong"])
-
-    with colB:
-        st.subheader("Produk B")
-        method_b = st.radio("Metode Input Produk B:", ["Input Manual", "Scan dengan Kamera"], key="method_b")
-        if method_b == "Scan dengan Kamera":
-            st.warning("Integrasi kamera langsung dalam mode perbandingan sedang dalam pengembangan tahap lanjut. Silakan gunakan tab 'Scan from Image' di sidebar untuk OCR, atau gunakan **Input Manual** di bawah ini.")
-            
-        prod_name_b, saji_b, nut_b, kompo_b = input_form("comp_b", EXAMPLE_PRESETS["Kosong"])
-
-    st.markdown("---")
-    
-    if st.button("⚖️ Bandingkan Kedua Produk", type="primary", use_container_width=True):
-        res_a = build_analysis_result(prod_name_a, saji_a, nut_a, kompo_a)
-        res_b = build_analysis_result(prod_name_b, saji_b, nut_b, kompo_b)
-
-        if res_a.get("status") == "ok" and res_b.get("status") == "ok":
-            # 1. Menampilkan Kesimpulan
-            st.markdown("### 🏆 Kesimpulan Perbandingan AI")
-            score_a = res_a["risk_score"]
-            score_b = res_b["risk_score"]
-            diff = abs(score_a - score_b)
-
-            if score_a < score_b:
-                st.success(f"Berdasarkan analisis nutrisi, **{res_a['product_name'] or 'Produk A'}** adalah pilihan yang lebih baik. Skor risikonya **{diff:.2f}% lebih rendah** dibandingkan {res_b['product_name'] or 'Produk B'}.")
-            elif score_b < score_a:
-                st.success(f"Berdasarkan analisis nutrisi, **{res_b['product_name'] or 'Produk B'}** adalah pilihan yang lebih baik. Skor risikonya **{diff:.2f}% lebih rendah** dibandingkan {res_a['product_name'] or 'Produk A'}.")
-            else:
-                st.info("Kedua produk memiliki metrik tingkat risiko yang identik secara numerik.")
-
-            # 2. Grafik Komparasi Sederhana
-            fig_comp = go.Figure(data=[
-                go.Bar(name=res_a['product_name'] or 'Produk A', x=['Skor Risiko AI (%)'], y=[score_a], marker_color='#3498DB', text=[f"{score_a:.1f}%"], textposition='auto'),
-                go.Bar(name=res_b['product_name'] or 'Produk B', x=['Skor Risiko AI (%)'], y=[score_b], marker_color='#E74C3C', text=[f"{score_b:.1f}%"], textposition='auto')
-            ])
-            fig_comp.update_layout(barmode='group', title="Perbandingan Head-to-Head Skor Risiko", height=400)
-            st.plotly_chart(fig_comp, use_container_width=True)
-
-            st.markdown("---")
-
-        # 3. Menampilkan Analisis Berdampingan
-        res_colA, res_colB = st.columns(2, gap="large")
-
-        with res_colA:
-            st.markdown(f"### Hasil: {res_a['product_name'] or 'Produk A'}")
-            render_analysis_side(res_a)
-            if res_a.get("status") == "ok":
-                render_holistic_nutrition_profile(res_a["nutrition_data"], res_a["takaran_saji"])
-                render_health_metrics(res_a["nutrition_data"], res_a["takaran_saji"], current_threshold, show_header=True)
-
-        with res_colB:
-            st.markdown(f"### Hasil: {res_b['product_name'] or 'Produk B'}")
-            render_analysis_side(res_b)
-            if res_b.get("status") == "ok":
-                render_holistic_nutrition_profile(res_b["nutrition_data"], res_b["takaran_saji"])
-                render_health_metrics(res_b["nutrition_data"], res_b["takaran_saji"], current_threshold, show_header=True)
-
-
 elif app_mode == "Scan from Image":
     st.header("Scan Produk Otomatis")
     st.info("Ambil foto dekat, lurus, tidak blur, dan pastikan label memenuhi sebagian besar area gambar. Setelah OCR selesai, koreksi data sebelum analisis.")
@@ -1041,7 +976,7 @@ elif app_mode == "Scan from Image":
             try:
                 image_1_original = Image.open(img_file_1)
                 image_1_display = standardize_image_size(image_1_original, target_ratio=4/3)
-                safe_image(image_1_display, caption="Gambar nilai gizi")
+                safe_image(image_1_display, caption="Gambar nilai gizi", width=350)
 
                 if st.button("Proses OCR Nilai Gizi", key="btn_ocr_gizi"):
                     with st.spinner("Mempersiapkan OCR dan membaca nilai gizi secara bertahap..."):
@@ -1083,7 +1018,7 @@ elif app_mode == "Scan from Image":
             try:
                 image_2_original = Image.open(img_file_2)
                 image_2_display = standardize_image_size(image_2_original, target_ratio=4/3)
-                safe_image(image_2_display, caption="Gambar komposisi")
+                safe_image(image_2_display, caption="Gambar komposisi", width=350)
 
                 if st.button("Proses OCR Komposisi", key="btn_ocr_komposisi"):
                     with st.spinner("Mempersiapkan OCR dan membaca komposisi secara bertahap..."):
@@ -1149,7 +1084,6 @@ elif app_mode == "Analisis Batch Excel":
     if uploaded_file is not None:
         df = pd.read_excel(uploaded_file)
         
-        # --- PERBAIKAN BUG TANGGAL EXCEL (Mencegah Angka Desimal Dibaca Sebagai Tanggal) ---
         numeric_cols_to_fix = [
             "Energi", "Lemak", "Lemak Total", "Lemak Jenuh", 
             "Karbohidrat", "Gula", "Protein", "Garam", 
@@ -1159,35 +1093,23 @@ elif app_mode == "Analisis Batch Excel":
         def fix_excel_date_bug(val):
             if pd.isna(val):
                 return 0.0
-            
-            # Jika sistem pandas terlanjur mengkonversinya menjadi tipe datetime atau Timestamp
             if isinstance(val, datetime) or type(val).__name__ == 'Timestamp':
-                # Excel regional ID mengubah misal '4.5' jadi '4 Mei' (hari 4, bulan 5)
-                # Kita kembalikan formatnya menjadi (hari.bulan)
                 return float(f"{val.day}.{val.month}")
-            
-            # Jika terbaca sebagai string, termasuk string datetime atau angka pakai koma
             if isinstance(val, str):
                 val = val.strip()
                 if not val:
                     return 0.0
-                
-                # Cek jika formatnya seperti "YYYY-MM-DD HH:MM:SS"
                 if re.match(r'^\d{4}-\d{2}-\d{2}', val):
                     try:
                         dt = pd.to_datetime(val)
                         return float(f"{dt.day}.{dt.month}")
                     except Exception:
                         pass
-                
-                # Ubah koma jadi titik untuk angka desimal
                 val = val.replace(',', '.')
                 try:
                     return float(val)
                 except ValueError:
                     return 0.0
-            
-            # Kembalikan sebagai angka biasa jika tidak ada masalah
             try:
                 return float(val)
             except Exception:
@@ -1196,7 +1118,6 @@ elif app_mode == "Analisis Batch Excel":
         for col in numeric_cols_to_fix:
             if col in df.columns:
                 df[col] = df[col].apply(fix_excel_date_bug)
-        # -------------------------------------------------------------------------------
         
         st.dataframe(df, use_container_width=True)
         
@@ -1397,6 +1318,181 @@ elif app_mode == "Analisis Batch Excel":
             
     else:
         st.session_state.batch_result_df = None
+
+
+# ================== FITUR PERBANDINGAN PRODUK ==================
+elif app_mode == "Perbandingan Produk":
+    st.header("Perbandingan Produk (Food Comparison Mode)")
+    st.info("Bandingkan metrik AI (Skor Risiko) dan metrik BI (Kepadatan Energi) dari dua produk sekaligus. Anda dapat menggunakan preset atau OCR untuk memindai label masing-masing produk.")
+
+    if "comp_a_data" not in st.session_state:
+        st.session_state.comp_a_data = init_parsed_data()
+    if "comp_b_data" not in st.session_state:
+        st.session_state.comp_b_data = init_parsed_data()
+    if "comp_a_ver" not in st.session_state:
+        st.session_state.comp_a_ver = 0
+    if "comp_b_ver" not in st.session_state:
+        st.session_state.comp_b_ver = 0
+
+    def apply_comp_preset_a():
+        st.session_state.comp_a_data = dict(EXAMPLE_PRESETS[st.session_state.preset_comp_a])
+        st.session_state.comp_a_ver += 1
+
+    def apply_comp_preset_b():
+        st.session_state.comp_b_data = dict(EXAMPLE_PRESETS[st.session_state.preset_comp_b])
+        st.session_state.comp_b_ver += 1
+
+    colA, colB = st.columns(2, gap="large")
+
+    with colA:
+        st.markdown("### 📦 Produk A")
+        method_a = st.radio("Metode Input Produk A:", ["Pilih Contoh Produk", "Scan Label (OCR)"], horizontal=True, key="method_a")
+        
+        if method_a == "Pilih Contoh Produk":
+            st.selectbox("Contoh Uji Produk A", list(EXAMPLE_PRESETS.keys()), key="preset_comp_a", on_change=apply_comp_preset_a)
+        else:
+            col_scan_gizi_a, col_scan_komp_a = st.columns(2)
+            with col_scan_gizi_a:
+                st.markdown("**1. Scan Nilai Gizi**")
+                type_a_gizi = st.radio("S. Gizi A", ["Upload", "Kamera"], key="type_a_gizi", horizontal=True, label_visibility="collapsed")
+                file_a_gizi = st.file_uploader("Foto Gizi A", type=["jpg", "jpeg", "png"], key="file_a_gizi") if type_a_gizi == "Upload" else st.camera_input("Kamera Gizi A", key="cam_a_gizi")
+                if file_a_gizi:
+                    img_a_gizi = Image.open(file_a_gizi)
+                    safe_image(standardize_image_size(img_a_gizi), caption="Gizi A", width=250)
+                    if st.button("🔍 OCR Gizi A", key="btn_ocr_a_gizi"):
+                        with st.spinner("Membaca..."):
+                            reader, err = get_ocr_reader_safely()
+                            if err: st.error(err)
+                            else:
+                                res, err2 = run_ocr_safely(reader, img_a_gizi, "nutrition")
+                                if err2: st.error(err2)
+                                else:
+                                    for k, v in res["parsed"].items():
+                                        if v not in [0, 0.0, "Tidak terdeteksi.", "", "Produk Tanpa Nama"]:
+                                            st.session_state.comp_a_data[k] = v
+                                    st.session_state.comp_a_ver += 1
+                                    st.success("Tersimpan!")
+
+            with col_scan_komp_a:
+                st.markdown("**2. Scan Komposisi**")
+                type_a_komp = st.radio("S. Komp A", ["Upload", "Kamera"], key="type_a_komp", horizontal=True, label_visibility="collapsed")
+                file_a_komp = st.file_uploader("Foto Komp A", type=["jpg", "jpeg", "png"], key="file_a_komp") if type_a_komp == "Upload" else st.camera_input("Kamera Komp A", key="cam_a_komp")
+                if file_a_komp:
+                    img_a_komp = Image.open(file_a_komp)
+                    safe_image(standardize_image_size(img_a_komp), caption="Komp A", width=250)
+                    if st.button("🔍 OCR Komposisi A", key="btn_ocr_a_komp"):
+                        with st.spinner("Membaca..."):
+                            reader, err = get_ocr_reader_safely()
+                            if err: st.error(err)
+                            else:
+                                res, err2 = run_ocr_safely(reader, img_a_komp, "composition")
+                                if err2: st.error(err2)
+                                else:
+                                    val = res["parsed"].get("komposisi", "")
+                                    if val and val != "Tidak terdeteksi.":
+                                        st.session_state.comp_a_data["komposisi"] = val
+                                    st.session_state.comp_a_ver += 1
+                                    st.success("Tersimpan!")
+
+        st.markdown("#### Form Data Produk A")
+        prod_name_a, saji_a, nut_a, kompo_a = input_form(f"comp_a_{st.session_state.comp_a_ver}", st.session_state.comp_a_data)
+
+    with colB:
+        st.markdown("### 📦 Produk B")
+        method_b = st.radio("Metode Input Produk B:", ["Pilih Contoh Produk", "Scan Label (OCR)"], horizontal=True, key="method_b")
+        
+        if method_b == "Pilih Contoh Produk":
+            st.selectbox("Contoh Uji Produk B", list(EXAMPLE_PRESETS.keys()), key="preset_comp_b", on_change=apply_comp_preset_b)
+        else:
+            col_scan_gizi_b, col_scan_komp_b = st.columns(2)
+            with col_scan_gizi_b:
+                st.markdown("**1. Scan Nilai Gizi**")
+                type_b_gizi = st.radio("S. Gizi B", ["Upload", "Kamera"], key="type_b_gizi", horizontal=True, label_visibility="collapsed")
+                file_b_gizi = st.file_uploader("Foto Gizi B", type=["jpg", "jpeg", "png"], key="file_b_gizi") if type_b_gizi == "Upload" else st.camera_input("Kamera Gizi B", key="cam_b_gizi")
+                if file_b_gizi:
+                    img_b_gizi = Image.open(file_b_gizi)
+                    safe_image(standardize_image_size(img_b_gizi), caption="Gizi B", width=250)
+                    if st.button("🔍 OCR Gizi B", key="btn_ocr_b_gizi"):
+                        with st.spinner("Membaca..."):
+                            reader, err = get_ocr_reader_safely()
+                            if err: st.error(err)
+                            else:
+                                res, err2 = run_ocr_safely(reader, img_b_gizi, "nutrition")
+                                if err2: st.error(err2)
+                                else:
+                                    for k, v in res["parsed"].items():
+                                        if v not in [0, 0.0, "Tidak terdeteksi.", "", "Produk Tanpa Nama"]:
+                                            st.session_state.comp_b_data[k] = v
+                                    st.session_state.comp_b_ver += 1
+                                    st.success("Tersimpan!")
+
+            with col_scan_komp_b:
+                st.markdown("**2. Scan Komposisi**")
+                type_b_komp = st.radio("S. Komp B", ["Upload", "Kamera"], key="type_b_komp", horizontal=True, label_visibility="collapsed")
+                file_b_komp = st.file_uploader("Foto Komp B", type=["jpg", "jpeg", "png"], key="file_b_komp") if type_b_komp == "Upload" else st.camera_input("Kamera Komp B", key="cam_b_komp")
+                if file_b_komp:
+                    img_b_komp = Image.open(file_b_komp)
+                    safe_image(standardize_image_size(img_b_komp), caption="Komp B", width=250)
+                    if st.button("🔍 OCR Komposisi B", key="btn_ocr_b_komp"):
+                        with st.spinner("Membaca..."):
+                            reader, err = get_ocr_reader_safely()
+                            if err: st.error(err)
+                            else:
+                                res, err2 = run_ocr_safely(reader, img_b_komp, "composition")
+                                if err2: st.error(err2)
+                                else:
+                                    val = res["parsed"].get("komposisi", "")
+                                    if val and val != "Tidak terdeteksi.":
+                                        st.session_state.comp_b_data["komposisi"] = val
+                                    st.session_state.comp_b_ver += 1
+                                    st.success("Tersimpan!")
+
+        st.markdown("#### Form Data Produk B")
+        prod_name_b, saji_b, nut_b, kompo_b = input_form(f"comp_b_{st.session_state.comp_b_ver}", st.session_state.comp_b_data)
+
+    st.markdown("---")
+    
+    if st.button("⚖️ Bandingkan Kedua Produk", type="primary", use_container_width=True):
+        res_a = build_analysis_result(prod_name_a, saji_a, nut_a, kompo_a)
+        res_b = build_analysis_result(prod_name_b, saji_b, nut_b, kompo_b)
+
+        if res_a.get("status") == "ok" and res_b.get("status") == "ok":
+            st.markdown("### 🏆 Kesimpulan Perbandingan AI")
+            score_a = res_a["risk_score"]
+            score_b = res_b["risk_score"]
+            diff = abs(score_a - score_b)
+
+            if score_a < score_b:
+                st.success(f"Berdasarkan analisis nutrisi, **{res_a['product_name'] or 'Produk A'}** adalah pilihan yang lebih baik. Skor risikonya **{diff:.2f}% lebih rendah** dibandingkan {res_b['product_name'] or 'Produk B'}.")
+            elif score_b < score_a:
+                st.success(f"Berdasarkan analisis nutrisi, **{res_b['product_name'] or 'Produk B'}** adalah pilihan yang lebih baik. Skor risikonya **{diff:.2f}% lebih rendah** dibandingkan {res_a['product_name'] or 'Produk A'}.")
+            else:
+                st.info("Kedua produk memiliki metrik tingkat risiko yang identik secara numerik.")
+
+            fig_comp = go.Figure(data=[
+                go.Bar(name=res_a['product_name'] or 'Produk A', x=['Skor Risiko AI (%)'], y=[score_a], marker_color='#3498DB', text=[f"{score_a:.1f}%"], textposition='auto'),
+                go.Bar(name=res_b['product_name'] or 'Produk B', x=['Skor Risiko AI (%)'], y=[score_b], marker_color='#E74C3C', text=[f"{score_b:.1f}%"], textposition='auto')
+            ])
+            fig_comp.update_layout(barmode='group', title="Perbandingan Head-to-Head Skor Risiko", height=400)
+            st.plotly_chart(fig_comp, use_container_width=True)
+
+            st.markdown("---")
+
+        res_colA, res_colB = st.columns(2, gap="large")
+
+        with res_colA:
+            st.markdown(f"### Hasil: {res_a['product_name'] or 'Produk A'}")
+            render_analysis_side(res_a)
+            if res_a.get("status") == "ok":
+                render_holistic_nutrition_profile(res_a["nutrition_data"], res_a["takaran_saji"])
+                render_health_metrics(res_a["nutrition_data"], res_a["takaran_saji"], current_threshold, show_header=True)
+
+        with res_colB:
+            st.markdown(f"### Hasil: {res_b['product_name'] or 'Produk B'}")
+            render_analysis_side(res_b)
+            if res_b.get("status") == "ok":
+                render_holistic_nutrition_profile(res_b["nutrition_data"], res_b["takaran_saji"])
+                render_health_metrics(res_b["nutrition_data"], res_b["takaran_saji"], current_threshold, show_header=True)
 
 
 elif app_mode == "Riwayat Analisis":
