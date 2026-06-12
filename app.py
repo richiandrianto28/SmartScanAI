@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import os
+import re
 import tempfile
 from datetime import datetime
 
@@ -551,7 +552,7 @@ def build_analysis_result(product_name, takaran_saji, nutrition_data, komposisi)
     }
 
 
-# FITUR BARU: Generator AI Insight Otomatis untuk Analisis Batch
+# FITUR AI Insight Generator
 def generate_batch_insights(df_results):
     if df_results is None or df_results.empty:
         return "Belum ada data untuk dianalisis."
@@ -605,7 +606,7 @@ def generate_batch_insights(df_results):
     return insight
 
 
-# FITUR BARU: Generate Report ke format PDF Profesional
+# FITUR Export Report PDF
 def generate_pdf_report(df_results, insight_text, fig_pie):
     from fpdf import FPDF
     
@@ -1075,6 +1076,55 @@ elif app_mode == "Analisis Batch Excel":
     if uploaded_file is not None:
         df = pd.read_excel(uploaded_file)
         
+        # --- PERBAIKAN BUG TANGGAL EXCEL (Mencegah Angka Desimal Dibaca Sebagai Tanggal) ---
+        numeric_cols_to_fix = [
+            "Energi", "Lemak", "Lemak Total", "Lemak Jenuh", 
+            "Karbohidrat", "Gula", "Protein", "Garam", 
+            "Natrium", "Natrium Benzoat", "Takaran Saji", "Takaran"
+        ]
+        
+        def fix_excel_date_bug(val):
+            if pd.isna(val):
+                return 0.0
+            
+            # Jika sistem pandas terlanjur mengkonversinya menjadi tipe datetime atau Timestamp
+            if isinstance(val, datetime) or type(val).__name__ == 'Timestamp':
+                # Excel regional ID mengubah misal '4.5' jadi '4 Mei' (hari 4, bulan 5)
+                # Kita kembalikan formatnya menjadi (hari.bulan)
+                return float(f"{val.day}.{val.month}")
+            
+            # Jika terbaca sebagai string, termasuk string datetime atau angka pakai koma
+            if isinstance(val, str):
+                val = val.strip()
+                if not val:
+                    return 0.0
+                
+                # Cek jika formatnya seperti "YYYY-MM-DD HH:MM:SS"
+                if re.match(r'^\d{4}-\d{2}-\d{2}', val):
+                    try:
+                        dt = pd.to_datetime(val)
+                        return float(f"{dt.day}.{dt.month}")
+                    except Exception:
+                        pass
+                
+                # Ubah koma jadi titik untuk angka desimal
+                val = val.replace(',', '.')
+                try:
+                    return float(val)
+                except ValueError:
+                    return 0.0
+            
+            # Kembalikan sebagai angka biasa jika tidak ada masalah
+            try:
+                return float(val)
+            except Exception:
+                return 0.0
+
+        for col in numeric_cols_to_fix:
+            if col in df.columns:
+                df[col] = df[col].apply(fix_excel_date_bug)
+        # -------------------------------------------------------------------------------
+        
         st.dataframe(df, use_container_width=True)
         
         if st.button("Mulai Analisis Batch", type="primary"):
@@ -1141,12 +1191,10 @@ elif app_mode == "Analisis Batch Excel":
             
             st.header("Hasil Analisis Batch")
 
-            # --- FITUR BARU: TAMPILKAN AI INSIGHT OTOMATIS DISINI ---
             st.markdown("### 🤖 Ringkasan AI Insight Otomatis")
             insight_text = generate_batch_insights(st.session_state.batch_result_df)
             st.info(insight_text)
             st.markdown("---")
-            # --------------------------------------------------------
             
             display_cols = ["Nama Produk", "Skor Risiko", "Klasifikasi", "Rekomendasi"]
             st.dataframe(st.session_state.batch_result_df[display_cols], use_container_width=True)
@@ -1241,7 +1289,6 @@ elif app_mode == "Analisis Batch Excel":
             except Exception as e:
                 st.error(f"Terjadi masalah saat merender visualisasi batch: {e}")
 
-            # --- FITUR BARU: DOWNLOAD EXCEL DAN PDF ---
             st.markdown("---")
             st.markdown("### 📥 Export Hasil Analisis")
 
