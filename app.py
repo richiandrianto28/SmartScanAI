@@ -790,13 +790,17 @@ def store_product_analysis_result(product_name, takaran_saji, nutrition_data, ko
         risk_score = analysis_result["risk_score"]
         risk_info = analysis_result["risk_info"]
         
+        # Jaga-jaga jika ada null values
+        if not product_name:
+            product_name = "Produk Tanpa Nama"
+        
         # Save flattened history for robust dataframe representation
         st.session_state.scan_history.append({
             "Waktu Analisis": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "Nama Produk": analysis_result["product_name"],
+            "Nama Produk": product_name,
             "Skor Risiko (%)": round(risk_score, 2),
             "Klasifikasi": risk_info["label"],
-            "Takaran Saji (g/ml)": analysis_result["takaran_saji"],
+            "Takaran Saji (g/ml)": takaran_saji,
             "Energi (kkal)": nutrition_data.get("energi", 0),
             "Lemak Total (g)": nutrition_data.get("lemak_total", 0),
             "Lemak Jenuh (g)": nutrition_data.get("lemak_jenuh", 0),
@@ -806,7 +810,7 @@ def store_product_analysis_result(product_name, takaran_saji, nutrition_data, ko
             "Garam (g)": nutrition_data.get("garam", 0),
             "Natrium (mg)": nutrition_data.get("natrium", 0),
             "Natrium Benzoat (mg)": nutrition_data.get("natrium_benzoat", 0),
-            "Komposisi": analysis_result["komposisi"],
+            "Komposisi": komposisi,
             "Rekomendasi": analysis_result.get("recommendation", "")
         })
 
@@ -1688,21 +1692,60 @@ elif app_mode == "Riwayat Analisis":
     st.header("Riwayat Analisis")
     st.write("Daftar lengkap riwayat analisis produk yang dilakukan pada sesi ini.")
     
+    if st.button("🗑️ Hapus Riwayat"):
+        st.session_state.scan_history = []
+        st.success("Riwayat berhasil dihapus!")
+
     if st.session_state.scan_history:
-        df_hist = pd.DataFrame(st.session_state.scan_history)
-        st.dataframe(df_hist, use_container_width=True)
+        valid_history = []
+        for item in st.session_state.scan_history:
+            if item.get('product_name') is None and item.get('Nama Produk') is None:
+                continue
+            
+            if 'date' in item:
+                nut_data = item.get('nutrition', {})
+                if isinstance(nut_data, str): 
+                    nut_data = {}
+                valid_history.append({
+                    "Waktu Analisis": item.get("date"),
+                    "Nama Produk": item.get("product_name"),
+                    "Skor Risiko (%)": item.get("risk_score"),
+                    "Klasifikasi": item.get("classification"),
+                    "Takaran Saji (g/ml)": 100, 
+                    "Energi (kkal)": nut_data.get("energi", 0) if isinstance(nut_data, dict) else 0,
+                    "Lemak Total (g)": nut_data.get("lemak_total", 0) if isinstance(nut_data, dict) else 0,
+                    "Lemak Jenuh (g)": nut_data.get("lemak_jenuh", 0) if isinstance(nut_data, dict) else 0,
+                    "Protein (g)": nut_data.get("protein", 0) if isinstance(nut_data, dict) else 0,
+                    "Karbohidrat (g)": nut_data.get("karbohidrat", 0) if isinstance(nut_data, dict) else 0,
+                    "Gula (g)": nut_data.get("gula", 0) if isinstance(nut_data, dict) else 0,
+                    "Garam (g)": nut_data.get("garam", 0) if isinstance(nut_data, dict) else 0,
+                    "Natrium (mg)": nut_data.get("natrium", 0) if isinstance(nut_data, dict) else 0,
+                    "Natrium Benzoat (mg)": nut_data.get("natrium_benzoat", 0) if isinstance(nut_data, dict) else 0,
+                    "Komposisi": "-",
+                    "Rekomendasi": "-"
+                })
+            else:
+                valid_history.append(item)
         
-        st.markdown("---")
-        output_hist = io.BytesIO()
-        with pd.ExcelWriter(output_hist, engine="openpyxl") as writer:
-            df_hist.to_excel(writer, index=False, sheet_name="Riwayat Analisis")
+        st.session_state.scan_history = valid_history
         
-        st.download_button(
-            label="📊 Download Riwayat (Excel)", 
-            data=output_hist.getvalue(), 
-            file_name="riwayat_analisis_nutriscan.xlsx",
-            use_container_width=True
-        )
+        if valid_history:
+            df_hist = pd.DataFrame(valid_history)
+            st.dataframe(df_hist, use_container_width=True)
+            
+            st.markdown("---")
+            output_hist = io.BytesIO()
+            with pd.ExcelWriter(output_hist, engine="openpyxl") as writer:
+                df_hist.to_excel(writer, index=False, sheet_name="Riwayat Analisis")
+            
+            st.download_button(
+                label="📊 Download Riwayat (Excel)", 
+                data=output_hist.getvalue(), 
+                file_name="riwayat_analisis_nutriscan.xlsx",
+                use_container_width=True
+            )
+        else:
+            st.info("Belum ada riwayat analisis pada sesi ini.")
     else:
         st.info("Belum ada riwayat analisis pada sesi ini.")
 
