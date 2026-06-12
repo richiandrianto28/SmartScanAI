@@ -1791,6 +1791,7 @@ elif app_mode == "Simulasi Konsumsi Produk":
             st.error("Silakan lengkapi data nutrisi produk untuk menjalankan simulasi.")
 
 
+# --- Update Bagian Riwayat Analisis ---
 elif app_mode == "Riwayat Analisis":
     st.header("Riwayat Analisis")
     st.write("Daftar lengkap riwayat analisis produk yang dilakukan pada sesi ini.")
