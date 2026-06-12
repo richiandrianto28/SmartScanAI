@@ -737,6 +737,86 @@ def generate_pdf_report(df_results, insight_text, fig_pie):
     return pdf_bytes
 
 
+# FITUR BARU: PDF Generate History
+def generate_history_pdf_report(df_history):
+    from fpdf import FPDF
+    
+    class PDFReport(FPDF):
+        def header(self):
+            self.set_font('Arial', 'B', 16)
+            self.set_text_color(15, 23, 42)
+            self.cell(0, 10, 'Riwayat Analisis - SMART NutriScan AI', 0, 1, 'C')
+            self.set_draw_color(200, 200, 200)
+            self.line(10, 22, 287, 22) # Landscape margin
+            self.ln(10)
+            
+        def footer(self):
+            self.set_y(-15)
+            self.set_font('Arial', 'I', 8)
+            self.set_text_color(100, 100, 100)
+            self.cell(0, 10, f'Halaman {self.page_no()}', 0, 0, 'C')
+
+    # Setup landscape A4 format
+    pdf = PDFReport(orientation='L', unit='mm', format='A4')
+    pdf.add_page()
+    
+    pdf.set_font("Arial", 'B', 12)
+    pdf.set_text_color(30, 41, 59)
+    pdf.cell(0, 10, f"Total Riwayat: {len(df_history)} Produk", 0, 1)
+    pdf.ln(2)
+    
+    # Table Header Configuration
+    pdf.set_font("Arial", 'B', 9)
+    pdf.set_fill_color(240, 244, 248)
+    
+    # Column widths for Landscape A4 (total ~ 277mm printable)
+    # Waktu(40), Nama Produk(80), Skor(20), Klasifikasi(25), Kalori(20), Gula(15), Lemak(15), Natrium(20) = Total 235mm
+    col_w = [40, 80, 20, 25, 20, 15, 15, 20]
+    headers = ["Waktu", "Nama Produk", "Skor", "Klasifikasi", "Kalori", "Gula", "Lemak", "Natrium"]
+    
+    for i in range(len(headers)):
+        pdf.cell(col_w[i], 10, headers[i], 1, 0, 'C', fill=True)
+    pdf.ln()
+    
+    # Table Content
+    pdf.set_font("Arial", '', 8)
+    pdf.set_text_color(0, 0, 0)
+    
+    for _, row in df_history.iterrows():
+        waktu = str(row.get('Waktu Analisis', ''))[:16]
+        name = str(row.get('Nama Produk', '')).strip()
+        if len(name) > 45: name = name[:42] + "..."
+        
+        skor_val = row.get('Skor Risiko (%)', 0)
+        skor = f"{skor_val}%" if pd.notna(skor_val) and skor_val != "Data belum cukup" else "-"
+        
+        klas = str(row.get('Klasifikasi', '-'))
+        energi = str(row.get('Energi (kkal)', '-'))
+        gula = str(row.get('Gula (g)', '-'))
+        lemak = str(row.get('Lemak Total (g)', '-'))
+        natrium = str(row.get('Natrium (mg)', '-'))
+        
+        # Format encoding safe
+        name = name.encode('latin-1', 'replace').decode('latin-1')
+        
+        pdf.cell(col_w[0], 8, f" {waktu}", 1, 0, 'C')
+        pdf.cell(col_w[1], 8, f" {name}", 1, 0, 'L')
+        pdf.cell(col_w[2], 8, skor, 1, 0, 'C')
+        pdf.cell(col_w[3], 8, klas, 1, 0, 'C')
+        pdf.cell(col_w[4], 8, energi, 1, 0, 'C')
+        pdf.cell(col_w[5], 8, gula, 1, 0, 'C')
+        pdf.cell(col_w[6], 8, lemak, 1, 0, 'C')
+        pdf.cell(col_w[7], 8, natrium, 1, 1, 'C')
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmpdf:
+        pdf.output(tmpdf.name)
+        with open(tmpdf.name, 'rb') as f:
+            pdf_bytes = f.read()
+    os.unlink(tmpdf.name)
+    
+    return pdf_bytes
+
+
 def render_analysis_side(analysis_result, current_signature=None):
     if not analysis_result:
         st.info("Hasil analisis akan muncul di sini setelah tombol analisis diklik.")
@@ -790,11 +870,9 @@ def store_product_analysis_result(product_name, takaran_saji, nutrition_data, ko
         risk_score = analysis_result["risk_score"]
         risk_info = analysis_result["risk_info"]
         
-        # Jaga-jaga jika ada null values
         if not product_name:
             product_name = "Produk Tanpa Nama"
         
-        # Save flattened history for robust dataframe representation
         st.session_state.scan_history.append({
             "Waktu Analisis": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "Nama Produk": product_name,
@@ -1687,7 +1765,6 @@ elif app_mode == "Simulasi Konsumsi Produk":
             st.error("Silakan lengkapi data nutrisi produk untuk menjalankan simulasi.")
 
 
-# --- Update Bagian Riwayat Analisis ---
 elif app_mode == "Riwayat Analisis":
     st.header("Riwayat Analisis")
     st.write("Daftar lengkap riwayat analisis produk yang dilakukan pada sesi ini.")
@@ -1738,12 +1815,34 @@ elif app_mode == "Riwayat Analisis":
             with pd.ExcelWriter(output_hist, engine="openpyxl") as writer:
                 df_hist.to_excel(writer, index=False, sheet_name="Riwayat Analisis")
             
-            st.download_button(
-                label="📊 Download Riwayat (Excel)", 
-                data=output_hist.getvalue(), 
-                file_name="riwayat_analisis_nutriscan.xlsx",
-                use_container_width=True
-            )
+            col_dl1, col_dl2 = st.columns(2)
+            with col_dl1:
+                st.download_button(
+                    label="📊 Download Riwayat (Excel)", 
+                    data=output_hist.getvalue(), 
+                    file_name="riwayat_analisis_nutriscan.xlsx",
+                    use_container_width=True
+                )
+            
+            with col_dl2:
+                try:
+                    from fpdf import FPDF
+                    pdf_ready = True
+                except ImportError:
+                    pdf_ready = False
+                
+                if pdf_ready:
+                    with st.spinner("Menyiapkan dokumen PDF..."):
+                        pdf_hist_data = generate_history_pdf_report(df_hist)
+                        st.download_button(
+                            label="📑 Download Riwayat (PDF)", 
+                            data=pdf_hist_data, 
+                            file_name="Riwayat_Analisis_NutriScan.pdf", 
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
+                else:
+                    st.warning("⚠️ Modul 'fpdf' belum terinstall. Jalankan `pip install fpdf` di terminal.")
         else:
             st.info("Belum ada riwayat analisis pada sesi ini.")
     else:
