@@ -737,7 +737,7 @@ def generate_pdf_report(df_results, insight_text, fig_pie):
     return pdf_bytes
 
 
-# FITUR BARU: PDF Generate History
+# FITUR BARU: PDF Generate History Lengkap tanpa Potong (Row-by-Row Card)
 def generate_history_pdf_report(df_history):
     from fpdf import FPDF
     
@@ -745,10 +745,8 @@ def generate_history_pdf_report(df_history):
         def header(self):
             self.set_font('Arial', 'B', 16)
             self.set_text_color(15, 23, 42)
-            self.cell(0, 10, 'Riwayat Analisis - SMART NutriScan AI', 0, 1, 'C')
-            self.set_draw_color(200, 200, 200)
-            self.line(10, 22, 287, 22) # Landscape margin
-            self.ln(10)
+            self.cell(0, 10, 'Riwayat Analisis Lengkap - SMART NutriScan AI', 0, 1, 'C')
+            self.ln(5)
             
         def footer(self):
             self.set_y(-15)
@@ -756,57 +754,95 @@ def generate_history_pdf_report(df_history):
             self.set_text_color(100, 100, 100)
             self.cell(0, 10, f'Halaman {self.page_no()}', 0, 0, 'C')
 
-    # Setup landscape A4 format
+    # Format Landscape A4
     pdf = PDFReport(orientation='L', unit='mm', format='A4')
     pdf.add_page()
     
     pdf.set_font("Arial", 'B', 12)
     pdf.set_text_color(30, 41, 59)
     pdf.cell(0, 10, f"Total Riwayat: {len(df_history)} Produk", 0, 1)
-    pdf.ln(2)
+    pdf.ln(5)
     
-    # Table Header Configuration
-    pdf.set_font("Arial", 'B', 9)
-    pdf.set_fill_color(240, 244, 248)
+    col_w = [25, 20, 25, 25, 20, 25, 20, 20, 25, 30]
+    total_table_width = sum(col_w)
     
-    # Column widths for Landscape A4 (total ~ 277mm printable)
-    # Waktu(40), Nama Produk(80), Skor(20), Klasifikasi(25), Kalori(20), Gula(15), Lemak(15), Natrium(20) = Total 235mm
-    col_w = [40, 80, 20, 25, 20, 15, 15, 20]
-    headers = ["Waktu", "Nama Produk", "Skor", "Klasifikasi", "Kalori", "Gula", "Lemak", "Natrium"]
-    
-    for i in range(len(headers)):
-        pdf.cell(col_w[i], 10, headers[i], 1, 0, 'C', fill=True)
-    pdf.ln()
-    
-    # Table Content
-    pdf.set_font("Arial", '', 8)
-    pdf.set_text_color(0, 0, 0)
-    
-    for _, row in df_history.iterrows():
+    for idx, row in df_history.iterrows():
+        # Judul per produk
+        pdf.set_font("Arial", 'B', 10)
+        pdf.set_fill_color(235, 240, 248)
+        
         waktu = str(row.get('Waktu Analisis', ''))[:16]
         name = str(row.get('Nama Produk', '')).strip()
-        if len(name) > 45: name = name[:42] + "..."
+        name = name.encode('latin-1', 'replace').decode('latin-1')
         
         skor_val = row.get('Skor Risiko (%)', 0)
         skor = f"{skor_val}%" if pd.notna(skor_val) and skor_val != "Data belum cukup" else "-"
-        
         klas = str(row.get('Klasifikasi', '-'))
-        energi = str(row.get('Energi (kkal)', '-'))
-        gula = str(row.get('Gula (g)', '-'))
-        lemak = str(row.get('Lemak Total (g)', '-'))
-        natrium = str(row.get('Natrium (mg)', '-'))
         
-        # Format encoding safe
-        name = name.encode('latin-1', 'replace').decode('latin-1')
+        title = f"{idx+1}. {name}   |   Waktu: {waktu}   |   Skor Risiko: {skor} ({klas})"
+        pdf.cell(total_table_width, 8, title, 1, 1, 'L', fill=True)
         
-        pdf.cell(col_w[0], 8, f" {waktu}", 1, 0, 'C')
-        pdf.cell(col_w[1], 8, f" {name}", 1, 0, 'L')
-        pdf.cell(col_w[2], 8, skor, 1, 0, 'C')
-        pdf.cell(col_w[3], 8, klas, 1, 0, 'C')
-        pdf.cell(col_w[4], 8, energi, 1, 0, 'C')
-        pdf.cell(col_w[5], 8, gula, 1, 0, 'C')
-        pdf.cell(col_w[6], 8, lemak, 1, 0, 'C')
-        pdf.cell(col_w[7], 8, natrium, 1, 1, 'C')
+        # Header Tabel Gizi
+        pdf.set_font("Arial", 'B', 8)
+        pdf.set_fill_color(245, 245, 245)
+        headers = ["Takaran(g)", "Energi", "Lemak Tot", "Lemak Jen", "Protein", "Karbohidrat", "Gula", "Garam", "Natrium(mg)", "N.Benzoat(mg)"]
+        
+        for i in range(len(headers)):
+            pdf.cell(col_w[i], 6, headers[i], 1, 0, 'C', fill=True)
+        pdf.ln()
+        
+        # Nilai Tabel Gizi
+        pdf.set_font("Arial", '', 8)
+        vals = [
+            str(row.get('Takaran Saji (g/ml)', '-')),
+            str(row.get('Energi (kkal)', '-')),
+            str(row.get('Lemak Total (g)', '-')),
+            str(row.get('Lemak Jenuh (g)', '-')),
+            str(row.get('Protein (g)', '-')),
+            str(row.get('Karbohidrat (g)', '-')),
+            str(row.get('Gula (g)', '-')),
+            str(row.get('Garam (g)', '-')),
+            str(row.get('Natrium (mg)', '-')),
+            str(row.get('Natrium Benzoat (mg)', '-'))
+        ]
+        for i in range(len(vals)):
+            pdf.cell(col_w[i], 6, vals[i], 1, 0, 'C')
+        pdf.ln()
+        
+        # Simpan indentasi (margin kiri)
+        current_l_margin = pdf.l_margin
+        
+        # Komposisi
+        pdf.ln(2)
+        pdf.set_font("Arial", 'B', 8)
+        pdf.cell(25, 5, "Komposisi:", 0, 0, 'L')
+        
+        x_start = pdf.get_x()
+        pdf.set_left_margin(x_start)
+        pdf.set_font("Arial", '', 8)
+        komposisi = str(row.get('Komposisi', '-')).encode('latin-1', 'replace').decode('latin-1')
+        komposisi = komposisi.replace('\n', ' ').replace('\r', '')
+        pdf.multi_cell(total_table_width - 25, 5, komposisi)
+        
+        # Kembalikan indentasi awal
+        pdf.set_left_margin(current_l_margin)
+        
+        # Rekomendasi
+        pdf.ln(1)
+        pdf.set_font("Arial", 'B', 8)
+        pdf.cell(25, 5, "Rekomendasi:", 0, 0, 'L')
+        
+        x_start = pdf.get_x()
+        pdf.set_left_margin(x_start)
+        pdf.set_font("Arial", '', 8)
+        rekomendasi = str(row.get('Rekomendasi', '-')).encode('latin-1', 'replace').decode('latin-1')
+        rekomendasi = rekomendasi.replace('\n', ' ').replace('\r', '')
+        pdf.multi_cell(total_table_width - 25, 5, rekomendasi)
+        
+        # Kembalikan indentasi awal
+        pdf.set_left_margin(current_l_margin)
+        
+        pdf.ln(8)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmpdf:
         pdf.output(tmpdf.name)
@@ -957,6 +993,16 @@ def input_form(prefix, defaults):
     )
 
     return product_name, takaran_saji, nutrition_data, komposisi
+
+
+# --- FITUR BARU: HEADER BANNER YANG RAPI ---
+try:
+    col_hdr1, col_hdr2, col_hdr3 = st.columns([1, 4, 1])
+    with col_hdr2:
+        st.image("assets/Header Smart NutriScan AI.png", use_container_width=True)
+except Exception:
+    pass
+# ---------------------------------------------
 
 
 with st.sidebar:
