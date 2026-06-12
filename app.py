@@ -765,6 +765,9 @@ def generate_history_pdf_report(df_history):
     pdf.cell(0, 10, f"Total Riwayat: {len(df_history)} Produk", 0, 1)
     pdf.ln(5)
     
+    col_w = [25, 20, 25, 25, 20, 25, 20, 20, 25, 30]
+    total_table_width = sum(col_w)
+    
     for idx, row in df_history.iterrows():
         # Judul per produk
         pdf.set_font("Arial", 'B', 10)
@@ -779,12 +782,11 @@ def generate_history_pdf_report(df_history):
         klas = str(row.get('Klasifikasi', '-'))
         
         title = f"{idx+1}. {name}   |   Waktu: {waktu}   |   Skor Risiko: {skor} ({klas})"
-        pdf.cell(0, 8, title, 1, 1, 'L', fill=True)
+        pdf.cell(total_table_width, 8, title, 1, 1, 'L', fill=True)
         
         # Header Tabel Gizi
         pdf.set_font("Arial", 'B', 8)
         pdf.set_fill_color(245, 245, 245)
-        col_w = [25, 20, 25, 25, 20, 25, 20, 20, 25, 30]
         headers = ["Takaran(g)", "Energi", "Lemak Tot", "Lemak Jen", "Protein", "Karbohidrat", "Gula", "Garam", "Natrium(mg)", "N.Benzoat(mg)"]
         
         for i in range(len(headers)):
@@ -814,14 +816,14 @@ def generate_history_pdf_report(df_history):
         pdf.cell(25, 6, "Komposisi:", 0, 0, 'L')
         pdf.set_font("Arial", '', 8)
         komposisi = str(row.get('Komposisi', '-')).encode('latin-1', 'replace').decode('latin-1')
-        pdf.multi_cell(0, 6, komposisi)
+        pdf.multi_cell(total_table_width - 25, 6, komposisi)
         
         # Rekomendasi
         pdf.set_font("Arial", 'B', 8)
         pdf.cell(25, 6, "Rekomendasi:", 0, 0, 'L')
         pdf.set_font("Arial", '', 8)
         rekomendasi = str(row.get('Rekomendasi', '-')).encode('latin-1', 'replace').decode('latin-1')
-        pdf.multi_cell(0, 6, rekomendasi)
+        pdf.multi_cell(total_table_width - 25, 6, rekomendasi)
         
         pdf.ln(6)
 
@@ -876,6 +878,7 @@ def render_analysis_bottom(analysis_result, current_threshold):
     render_health_metrics(nutrition_data, takaran_saji, current_threshold, show_header=True)
 
 
+# --- Update: Record ALL inputs into history dataframe ---
 def store_product_analysis_result(product_name, takaran_saji, nutrition_data, komposisi, store_key, input_signature=None):
     analysis_result = build_analysis_result(product_name, takaran_saji, nutrition_data, komposisi)
     analysis_result["input_signature"] = input_signature or make_analysis_signature(product_name, takaran_saji, nutrition_data, komposisi)
@@ -974,6 +977,13 @@ def input_form(prefix, defaults):
 
     return product_name, takaran_saji, nutrition_data, komposisi
 
+
+# --- FITUR BARU: HEADER BANNER ---
+try:
+    st.image("assets/Header Smart NutriScan AI.png", width=800)
+except Exception:
+    pass
+# ----------------------------------
 
 with st.sidebar:
     try:
