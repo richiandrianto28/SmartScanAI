@@ -415,15 +415,10 @@ def render_recommendation_details(risk_info, recommendation_text, is_upf, upf_fl
         """)
 
 
-def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
-    st.markdown("### 📊 Profil Gizi & Makronutrien Holistik")
-    st.caption("Analisis mendalam mengenai sumber kalori dan dampak glikemik berdasarkan takaran saji.")
-
+def render_nutrition_kepadatan_gula(nutrition_data, takaran_saji):
     energi = float(nutrition_data.get("energi", 0))
     gula = float(nutrition_data.get("gula", 0))
     karbohidrat = float(nutrition_data.get("karbohidrat", 0))
-    lemak_total = float(nutrition_data.get("lemak_total", 0))
-    protein = float(nutrition_data.get("protein", 0))
 
     kepadatan = energi / takaran_saji if takaran_saji > 0 else 0
     rasio_gula = (gula / karbohidrat * 100) if karbohidrat > 0 else 0
@@ -456,8 +451,11 @@ def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
             st.success("↓ 🟢 Rendah Gula")
             st.caption("Sebagian besar karbohidrat berasal dari sumber kompleks yang lebih lama dicerna.")
 
-    st.write("")
-    st.markdown("**Distribusi Sumber Kalori (Macronutrient Split)**")
+
+def render_nutrition_pie_chart(nutrition_data):
+    lemak_total = float(nutrition_data.get("lemak_total", 0))
+    karbohidrat = float(nutrition_data.get("karbohidrat", 0))
+    protein = float(nutrition_data.get("protein", 0))
 
     kalori_lemak = lemak_total * 9
     kalori_karbo = karbohidrat * 4
@@ -475,6 +473,15 @@ def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Data makronutrien kosong atau bernilai nol. Isi Lemak, Karbohidrat, dan Protein untuk melihat rasio kalori.")
+
+
+def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
+    st.markdown("### 📊 Profil Gizi & Makronutrien Holistik")
+    st.caption("Analisis mendalam mengenai sumber kalori dan dampak glikemik berdasarkan takaran saji.")
+    render_nutrition_kepadatan_gula(nutrition_data, takaran_saji)
+    st.write("")
+    st.markdown("**Distribusi Sumber Kalori (Macronutrient Split)**")
+    render_nutrition_pie_chart(nutrition_data)
 
 
 def custom_progress_bar(label, current_val, max_val, unit, color, percentage):
@@ -1455,7 +1462,6 @@ elif app_mode == "Perbandingan Produk":
         res_b = build_analysis_result(prod_name_b, saji_b, nut_b, kompo_b)
 
         if res_a.get("status") == "ok" and res_b.get("status") == "ok":
-            # 1. Menampilkan Kesimpulan
             st.markdown("### 🏆 Kesimpulan Perbandingan AI")
             score_a = res_a["risk_score"]
             score_b = res_b["risk_score"]
@@ -1468,7 +1474,6 @@ elif app_mode == "Perbandingan Produk":
             else:
                 st.info("Kedua produk memiliki metrik tingkat risiko yang identik secara numerik.")
 
-            # 2. Grafik Komparasi Sederhana
             fig_comp = go.Figure(data=[
                 go.Bar(name=res_a['product_name'] or 'Produk A', x=['Skor Risiko AI (%)'], y=[score_a], marker_color='#3498DB', text=[f"{score_a:.1f}%"], textposition='auto'),
                 go.Bar(name=res_b['product_name'] or 'Produk B', x=['Skor Risiko AI (%)'], y=[score_b], marker_color='#E74C3C', text=[f"{score_b:.1f}%"], textposition='auto')
@@ -1478,9 +1483,6 @@ elif app_mode == "Perbandingan Produk":
 
             st.markdown("---")
 
-        # 3. Menampilkan Analisis Berdampingan secara sejajar (Row-by-Row)
-        
-        # BARIS 1: Header & Analisis AI (Skor dan Radar)
         row1_colA, row1_colB = st.columns(2, gap="large")
         with row1_colA:
             st.markdown(f"### Hasil: {res_a['product_name'] or 'Produk A'}")
@@ -1492,7 +1494,6 @@ elif app_mode == "Perbandingan Produk":
         if res_a.get("status") == "ok" and res_b.get("status") == "ok":
             st.markdown("---")
             
-            # BARIS 2: Rekomendasi & Deteksi UPF
             row2_colA, row2_colB = st.columns(2, gap="large")
             with row2_colA:
                 risk_info_a = res_a.get("risk_info", classify_risk(res_a.get("risk_score", 0)))
@@ -1503,16 +1504,26 @@ elif app_mode == "Perbandingan Produk":
                 
             st.markdown("---")
             
-            # BARIS 3: Profil Gizi Holistik (Pie Chart Kepadatan Energi dll)
-            row3_colA, row3_colB = st.columns(2, gap="large")
-            with row3_colA:
-                render_holistic_nutrition_profile(res_a["nutrition_data"], res_a["takaran_saji"])
-            with row3_colB:
-                render_holistic_nutrition_profile(res_b["nutrition_data"], res_b["takaran_saji"])
+            st.markdown("### 📊 Profil Gizi & Makronutrien Holistik")
+            st.caption("Analisis mendalam mengenai sumber kalori dan dampak glikemik berdasarkan takaran saji.")
+            
+            row3a_colA, row3a_colB = st.columns(2, gap="large")
+            with row3a_colA:
+                render_nutrition_kepadatan_gula(res_a["nutrition_data"], res_a["takaran_saji"])
+            with row3a_colB:
+                render_nutrition_kepadatan_gula(res_b["nutrition_data"], res_b["takaran_saji"])
+
+            st.write("")
+            st.markdown("**Distribusi Sumber Kalori (Macronutrient Split)**")
+            
+            row3b_colA, row3b_colB = st.columns(2, gap="large")
+            with row3b_colA:
+                render_nutrition_pie_chart(res_a["nutrition_data"])
+            with row3b_colB:
+                render_nutrition_pie_chart(res_b["nutrition_data"])
                 
             st.markdown("---")
             
-            # BARIS 4: Pemenuhan Angka Kecukupan Gizi Harian (Progress Bars)
             row4_colA, row4_colB = st.columns(2, gap="large")
             with row4_colA:
                 render_health_metrics(res_a["nutrition_data"], res_a["takaran_saji"], current_threshold, show_header=True)
