@@ -906,7 +906,7 @@ with st.sidebar:
             "Scan from Image",
             "Analisis Batch Excel",
             "Perbandingan Produk",  
-            "Simulasi Konsumsi Produk", # <-- FITUR BARU 
+            "Simulasi Konsumsi Produk",
             "Riwayat Analisis",
             "Edukasi Gizi",
         ],
@@ -1532,7 +1532,6 @@ elif app_mode == "Perbandingan Produk":
                 render_health_metrics(res_b["nutrition_data"], res_b["takaran_saji"], current_threshold, show_header=True)
 
 
-# ================== FITUR BARU: SIMULASI KONSUMSI PRODUK ==================
 elif app_mode == "Simulasi Konsumsi Produk":
     st.header("Simulasi Konsumsi Produk")
     st.info("Masukkan detail produk dan perkirakan dampak risikonya berdasarkan frekuensi konsumsi Anda.")
@@ -1610,7 +1609,6 @@ elif app_mode == "Simulasi Konsumsi Produk":
             st.markdown("---")
             st.markdown("### 📈 Hasil Simulasi")
             
-            # Perhitungan simulasi (Asumsi 1 bulan = 4 minggu)
             total_weeks = sim_period * 4
             total_servings = freq_weekly * total_weeks
             
@@ -1628,9 +1626,12 @@ elif app_mode == "Simulasi Konsumsi Produk":
             st.info("Simulasi ini membantu memvisualisasikan bagaimana konsumsi rutin produk dengan profil gizi di atas dapat menumpuk dan berdampak pada tubuh Anda seiring waktu (asumsi 1 sendok makan gula = 15g, 7700 kalori surplus = 1 kg lemak tubuh).")
             
             st.markdown("---")
-            st.markdown("#### Profil & Analisis Produk Dasar")
+            
+            # MENGUNCI POSISI AGAR JUDUL DAN KONTEN SEJAJAR SECARA HORIZONTAL
             col_simA, col_simB = st.columns(2, gap="large")
             with col_simA:
+                st.markdown("### 📋 Profil & Analisis Produk Dasar")
+                st.caption("Ringkasan prediksi risiko dan kontribusi nutrisi utama.")
                 render_analysis_side(res_sim)
             with col_simB:
                 render_holistic_nutrition_profile(res_sim["nutrition_data"], res_sim["takaran_saji"])
