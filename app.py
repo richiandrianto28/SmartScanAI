@@ -1191,7 +1191,7 @@ elif app_mode == "Analisis Batch Excel":
             
             st.header("Hasil Analisis Batch")
 
-            st.markdown("### 🤖 Ringkasan AI Insight Otomatis")
+            st.markdown("### 🤖 Ringkasan Insight Otomatis")
             insight_text = generate_batch_insights(st.session_state.batch_result_df)
             st.info(insight_text)
             st.markdown("---")
