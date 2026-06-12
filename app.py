@@ -886,10 +886,12 @@ with st.sidebar:
         st.write(f"Lemak jenuh: {current_threshold['lemak_jenuh']:.2f} g")
         st.write(f"Natrium: {current_threshold['natrium']:.2f} mg")
 
+    # ---> FITUR BARU: Menambahkan opsi Perbandingan Produk ke Sidebar
     app_mode = st.radio(
         "Pilih Fitur",
         [
             "Analisis Produk Tunggal",
+            "Perbandingan Produk",
             "Scan from Image",
             "Analisis Batch Excel",
             "Riwayat Analisis",
@@ -945,6 +947,77 @@ if app_mode == "Analisis Produk Tunggal":
         render_analysis_side(st.session_state.manual_analysis_result, current_signature=manual_signature)
 
     render_analysis_bottom(st.session_state.manual_analysis_result, current_threshold)
+
+
+# ================= FITUR BARU: PERBANDINGAN PRODUK =================
+elif app_mode == "Perbandingan Produk":
+    st.header("Perbandingan Produk (Food Comparison Mode)")
+    st.info("Bandingkan metrik AI (Skor Risiko) dan metrik BI (Kepadatan Energi) dari dua produk sekaligus.")
+
+    colA, colB = st.columns(2, gap="large")
+
+    with colA:
+        st.subheader("Produk A")
+        method_a = st.radio("Metode Input Produk A:", ["Input Manual", "Scan dengan Kamera"], key="method_a")
+        if method_a == "Scan dengan Kamera":
+            st.warning("Integrasi kamera langsung dalam mode perbandingan sedang dalam pengembangan tahap lanjut. Silakan gunakan tab 'Scan from Image' di sidebar untuk OCR, atau gunakan **Input Manual** di bawah ini.")
+        
+        prod_name_a, saji_a, nut_a, kompo_a = input_form("comp_a", EXAMPLE_PRESETS["Kosong"])
+
+    with colB:
+        st.subheader("Produk B")
+        method_b = st.radio("Metode Input Produk B:", ["Input Manual", "Scan dengan Kamera"], key="method_b")
+        if method_b == "Scan dengan Kamera":
+            st.warning("Integrasi kamera langsung dalam mode perbandingan sedang dalam pengembangan tahap lanjut. Silakan gunakan tab 'Scan from Image' di sidebar untuk OCR, atau gunakan **Input Manual** di bawah ini.")
+            
+        prod_name_b, saji_b, nut_b, kompo_b = input_form("comp_b", EXAMPLE_PRESETS["Kosong"])
+
+    st.markdown("---")
+    
+    if st.button("⚖️ Bandingkan Kedua Produk", type="primary", use_container_width=True):
+        res_a = build_analysis_result(prod_name_a, saji_a, nut_a, kompo_a)
+        res_b = build_analysis_result(prod_name_b, saji_b, nut_b, kompo_b)
+
+        if res_a.get("status") == "ok" and res_b.get("status") == "ok":
+            # 1. Menampilkan Kesimpulan
+            st.markdown("### 🏆 Kesimpulan Perbandingan AI")
+            score_a = res_a["risk_score"]
+            score_b = res_b["risk_score"]
+            diff = abs(score_a - score_b)
+
+            if score_a < score_b:
+                st.success(f"Berdasarkan analisis nutrisi, **{res_a['product_name'] or 'Produk A'}** adalah pilihan yang lebih baik. Skor risikonya **{diff:.2f}% lebih rendah** dibandingkan {res_b['product_name'] or 'Produk B'}.")
+            elif score_b < score_a:
+                st.success(f"Berdasarkan analisis nutrisi, **{res_b['product_name'] or 'Produk B'}** adalah pilihan yang lebih baik. Skor risikonya **{diff:.2f}% lebih rendah** dibandingkan {res_a['product_name'] or 'Produk A'}.")
+            else:
+                st.info("Kedua produk memiliki metrik tingkat risiko yang identik secara numerik.")
+
+            # 2. Grafik Komparasi Sederhana
+            fig_comp = go.Figure(data=[
+                go.Bar(name=res_a['product_name'] or 'Produk A', x=['Skor Risiko AI (%)'], y=[score_a], marker_color='#3498DB', text=[f"{score_a:.1f}%"], textposition='auto'),
+                go.Bar(name=res_b['product_name'] or 'Produk B', x=['Skor Risiko AI (%)'], y=[score_b], marker_color='#E74C3C', text=[f"{score_b:.1f}%"], textposition='auto')
+            ])
+            fig_comp.update_layout(barmode='group', title="Perbandingan Head-to-Head Skor Risiko", height=400)
+            st.plotly_chart(fig_comp, use_container_width=True)
+
+            st.markdown("---")
+
+        # 3. Menampilkan Analisis Berdampingan
+        res_colA, res_colB = st.columns(2, gap="large")
+
+        with res_colA:
+            st.markdown(f"### Hasil: {res_a['product_name'] or 'Produk A'}")
+            render_analysis_side(res_a)
+            if res_a.get("status") == "ok":
+                render_holistic_nutrition_profile(res_a["nutrition_data"], res_a["takaran_saji"])
+                render_health_metrics(res_a["nutrition_data"], res_a["takaran_saji"], current_threshold, show_header=True)
+
+        with res_colB:
+            st.markdown(f"### Hasil: {res_b['product_name'] or 'Produk B'}")
+            render_analysis_side(res_b)
+            if res_b.get("status") == "ok":
+                render_holistic_nutrition_profile(res_b["nutrition_data"], res_b["takaran_saji"])
+                render_health_metrics(res_b["nutrition_data"], res_b["takaran_saji"], current_threshold, show_header=True)
 
 
 elif app_mode == "Scan from Image":
