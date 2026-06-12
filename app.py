@@ -74,7 +74,6 @@ def standardize_image_size(image, target_ratio=4/3):
     return new_img
 
 
-# Update: Penyesuaian batas lebar gambar agar seragam dan tidak terlalu besar
 def safe_image(image, caption=None, width=None):
     try:
         if width:
@@ -1320,7 +1319,6 @@ elif app_mode == "Analisis Batch Excel":
         st.session_state.batch_result_df = None
 
 
-# ================== FITUR PERBANDINGAN PRODUK ==================
 elif app_mode == "Perbandingan Produk":
     st.header("Perbandingan Produk (Food Comparison Mode)")
     st.info("Bandingkan metrik AI (Skor Risiko) dan metrik BI (Kepadatan Energi) dari dua produk sekaligus. Anda dapat menggunakan preset atau OCR untuk memindai label masing-masing produk.")
@@ -1457,6 +1455,7 @@ elif app_mode == "Perbandingan Produk":
         res_b = build_analysis_result(prod_name_b, saji_b, nut_b, kompo_b)
 
         if res_a.get("status") == "ok" and res_b.get("status") == "ok":
+            # 1. Menampilkan Kesimpulan
             st.markdown("### 🏆 Kesimpulan Perbandingan AI")
             score_a = res_a["risk_score"]
             score_b = res_b["risk_score"]
@@ -1469,6 +1468,7 @@ elif app_mode == "Perbandingan Produk":
             else:
                 st.info("Kedua produk memiliki metrik tingkat risiko yang identik secara numerik.")
 
+            # 2. Grafik Komparasi Sederhana
             fig_comp = go.Figure(data=[
                 go.Bar(name=res_a['product_name'] or 'Produk A', x=['Skor Risiko AI (%)'], y=[score_a], marker_color='#3498DB', text=[f"{score_a:.1f}%"], textposition='auto'),
                 go.Bar(name=res_b['product_name'] or 'Produk B', x=['Skor Risiko AI (%)'], y=[score_b], marker_color='#E74C3C', text=[f"{score_b:.1f}%"], textposition='auto')
@@ -1478,20 +1478,45 @@ elif app_mode == "Perbandingan Produk":
 
             st.markdown("---")
 
-        res_colA, res_colB = st.columns(2, gap="large")
-
-        with res_colA:
+        # 3. Menampilkan Analisis Berdampingan secara sejajar (Row-by-Row)
+        
+        # BARIS 1: Header & Analisis AI (Skor dan Radar)
+        row1_colA, row1_colB = st.columns(2, gap="large")
+        with row1_colA:
             st.markdown(f"### Hasil: {res_a['product_name'] or 'Produk A'}")
             render_analysis_side(res_a)
-            if res_a.get("status") == "ok":
-                render_holistic_nutrition_profile(res_a["nutrition_data"], res_a["takaran_saji"])
-                render_health_metrics(res_a["nutrition_data"], res_a["takaran_saji"], current_threshold, show_header=True)
-
-        with res_colB:
+        with row1_colB:
             st.markdown(f"### Hasil: {res_b['product_name'] or 'Produk B'}")
             render_analysis_side(res_b)
-            if res_b.get("status") == "ok":
+
+        if res_a.get("status") == "ok" and res_b.get("status") == "ok":
+            st.markdown("---")
+            
+            # BARIS 2: Rekomendasi & Deteksi UPF
+            row2_colA, row2_colB = st.columns(2, gap="large")
+            with row2_colA:
+                risk_info_a = res_a.get("risk_info", classify_risk(res_a.get("risk_score", 0)))
+                render_recommendation_details(risk_info_a, res_a.get("recommendation", ""), res_a.get("is_upf"), res_a.get("upf_flags", []))
+            with row2_colB:
+                risk_info_b = res_b.get("risk_info", classify_risk(res_b.get("risk_score", 0)))
+                render_recommendation_details(risk_info_b, res_b.get("recommendation", ""), res_b.get("is_upf"), res_b.get("upf_flags", []))
+                
+            st.markdown("---")
+            
+            # BARIS 3: Profil Gizi Holistik (Pie Chart Kepadatan Energi dll)
+            row3_colA, row3_colB = st.columns(2, gap="large")
+            with row3_colA:
+                render_holistic_nutrition_profile(res_a["nutrition_data"], res_a["takaran_saji"])
+            with row3_colB:
                 render_holistic_nutrition_profile(res_b["nutrition_data"], res_b["takaran_saji"])
+                
+            st.markdown("---")
+            
+            # BARIS 4: Pemenuhan Angka Kecukupan Gizi Harian (Progress Bars)
+            row4_colA, row4_colB = st.columns(2, gap="large")
+            with row4_colA:
+                render_health_metrics(res_a["nutrition_data"], res_a["takaran_saji"], current_threshold, show_header=True)
+            with row4_colB:
                 render_health_metrics(res_b["nutrition_data"], res_b["takaran_saji"], current_threshold, show_header=True)
 
 
