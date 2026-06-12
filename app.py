@@ -906,6 +906,7 @@ with st.sidebar:
             "Scan from Image",
             "Analisis Batch Excel",
             "Perbandingan Produk",  
+            "Simulasi Konsumsi Produk", # <-- FITUR BARU 
             "Riwayat Analisis",
             "Edukasi Gizi",
         ],
@@ -1351,11 +1352,11 @@ elif app_mode == "Perbandingan Produk":
 
     with colA:
         st.markdown("### 📦 Produk A")
-        method_a = st.radio("Metode Input Produk A:", ["Pilih Contoh Produk", "Scan Label (OCR)"], horizontal=True, key="method_a")
+        method_a = st.radio("Metode Input Produk A:", ["Pilih Contoh Produk", "Scan Label (OCR)", "Input Manual"], horizontal=True, key="method_a")
         
         if method_a == "Pilih Contoh Produk":
             st.selectbox("Contoh Uji Produk A", list(EXAMPLE_PRESETS.keys()), key="preset_comp_a", on_change=apply_comp_preset_a)
-        else:
+        elif method_a == "Scan Label (OCR)":
             col_scan_gizi_a, col_scan_komp_a = st.columns(2)
             with col_scan_gizi_a:
                 st.markdown("**1. Scan Nilai Gizi**")
@@ -1404,11 +1405,11 @@ elif app_mode == "Perbandingan Produk":
 
     with colB:
         st.markdown("### 📦 Produk B")
-        method_b = st.radio("Metode Input Produk B:", ["Pilih Contoh Produk", "Scan Label (OCR)"], horizontal=True, key="method_b")
+        method_b = st.radio("Metode Input Produk B:", ["Pilih Contoh Produk", "Scan Label (OCR)", "Input Manual"], horizontal=True, key="method_b")
         
         if method_b == "Pilih Contoh Produk":
             st.selectbox("Contoh Uji Produk B", list(EXAMPLE_PRESETS.keys()), key="preset_comp_b", on_change=apply_comp_preset_b)
-        else:
+        elif method_b == "Scan Label (OCR)":
             col_scan_gizi_b, col_scan_komp_b = st.columns(2)
             with col_scan_gizi_b:
                 st.markdown("**1. Scan Nilai Gizi**")
@@ -1529,6 +1530,119 @@ elif app_mode == "Perbandingan Produk":
                 render_health_metrics(res_a["nutrition_data"], res_a["takaran_saji"], current_threshold, show_header=True)
             with row4_colB:
                 render_health_metrics(res_b["nutrition_data"], res_b["takaran_saji"], current_threshold, show_header=True)
+
+
+# ================== FITUR BARU: SIMULASI KONSUMSI PRODUK ==================
+elif app_mode == "Simulasi Konsumsi Produk":
+    st.header("Simulasi Konsumsi Produk")
+    st.info("Masukkan detail produk dan perkirakan dampak risikonya berdasarkan frekuensi konsumsi Anda.")
+
+    if "sim_data" not in st.session_state:
+        st.session_state.sim_data = init_parsed_data()
+    if "sim_ver" not in st.session_state:
+        st.session_state.sim_ver = 0
+
+    def apply_sim_preset():
+        st.session_state.sim_data = dict(EXAMPLE_PRESETS[st.session_state.preset_sim])
+        st.session_state.sim_ver += 1
+
+    st.markdown("### Langkah 1: Definisikan Produk")
+    method_sim = st.radio("Metode Input Produk:", ["Pilih Contoh Produk", "Scan Label (OCR)", "Input Manual"], horizontal=True, key="method_sim")
+    
+    if method_sim == "Pilih Contoh Produk":
+        st.selectbox("Contoh Uji Produk", list(EXAMPLE_PRESETS.keys()), key="preset_sim", on_change=apply_sim_preset)
+    elif method_sim == "Scan Label (OCR)":
+        col_scan_gizi_sim, col_scan_komp_sim = st.columns(2)
+        with col_scan_gizi_sim:
+            st.markdown("**1. Scan Nilai Gizi**")
+            type_sim_gizi = st.radio("S. Gizi Sim", ["Upload", "Kamera"], key="type_sim_gizi", horizontal=True, label_visibility="collapsed")
+            file_sim_gizi = st.file_uploader("Foto Gizi Sim", type=["jpg", "jpeg", "png"], key="file_sim_gizi") if type_sim_gizi == "Upload" else st.camera_input("Kamera Gizi Sim", key="cam_sim_gizi")
+            if file_sim_gizi:
+                img_sim_gizi = Image.open(file_sim_gizi)
+                safe_image(standardize_image_size(img_sim_gizi), caption="Gizi Sim", width=250)
+                if st.button("🔍 OCR Gizi", key="btn_ocr_sim_gizi"):
+                    with st.spinner("Membaca..."):
+                        reader, err = get_ocr_reader_safely()
+                        if err: st.error(err)
+                        else:
+                            res, err2 = run_ocr_safely(reader, img_sim_gizi, "nutrition")
+                            if err2: st.error(err2)
+                            else:
+                                for k, v in res["parsed"].items():
+                                    if v not in [0, 0.0, "Tidak terdeteksi.", "", "Produk Tanpa Nama"]:
+                                        st.session_state.sim_data[k] = v
+                                st.session_state.sim_ver += 1
+                                st.success("Tersimpan!")
+
+        with col_scan_komp_sim:
+            st.markdown("**2. Scan Komposisi**")
+            type_sim_komp = st.radio("S. Komp Sim", ["Upload", "Kamera"], key="type_sim_komp", horizontal=True, label_visibility="collapsed")
+            file_sim_komp = st.file_uploader("Foto Komp Sim", type=["jpg", "jpeg", "png"], key="file_sim_komp") if type_sim_komp == "Upload" else st.camera_input("Kamera Komp Sim", key="cam_sim_komp")
+            if file_sim_komp:
+                img_sim_komp = Image.open(file_sim_komp)
+                safe_image(standardize_image_size(img_sim_komp), caption="Komp Sim", width=250)
+                if st.button("🔍 OCR Komposisi", key="btn_ocr_sim_komp"):
+                    with st.spinner("Membaca..."):
+                        reader, err = get_ocr_reader_safely()
+                        if err: st.error(err)
+                        else:
+                            res, err2 = run_ocr_safely(reader, img_sim_komp, "composition")
+                            if err2: st.error(err2)
+                            else:
+                                val = res["parsed"].get("komposisi", "")
+                                if val and val != "Tidak terdeteksi.":
+                                    st.session_state.sim_data["komposisi"] = val
+                                st.session_state.sim_ver += 1
+                                st.success("Tersimpan!")
+
+    prod_name_sim, saji_sim, nut_sim, kompo_sim = input_form(f"sim_{st.session_state.sim_ver}", st.session_state.sim_data)
+
+    st.markdown("---")
+    st.markdown("### Langkah 2: Atur Pola Konsumsi")
+    col_pola1, col_pola2 = st.columns(2)
+    freq_weekly = col_pola1.slider("Frekuensi konsumsi per minggu (kali/sajian)", 1, 21, 3)
+    sim_period = col_pola2.slider("Periode Simulasi (Bulan)", 1, 12, 1)
+
+    if st.button("🚀 Jalankan Simulasi", type="primary", use_container_width=True):
+        res_sim = build_analysis_result(prod_name_sim, saji_sim, nut_sim, kompo_sim)
+        
+        if res_sim.get("status") == "ok":
+            st.markdown("---")
+            st.markdown("### 📈 Hasil Simulasi")
+            
+            # Perhitungan simulasi (Asumsi 1 bulan = 4 minggu)
+            total_weeks = sim_period * 4
+            total_servings = freq_weekly * total_weeks
+            
+            acc_sugar = float(nut_sim.get("gula", 0)) * total_servings
+            acc_sodium = float(nut_sim.get("natrium", 0)) * total_servings
+            acc_cal = float(nut_sim.get("energi", 0)) * total_servings
+            
+            st.markdown("#### Dampak Akumulatif pada Tubuh Anda")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Total Sajian Dikonsumsi", f"{int(total_servings)} porsi", f"Dalam {sim_period} bulan")
+            c2.metric("Total Gula Menumpuk", f"{acc_sugar:.1f} g", f"Setara ~ {acc_sugar/15:.1f} sdm gula")
+            c3.metric("Total Kalori Ekstra", f"{acc_cal:.1f} kkal", f"Setara ~ {acc_cal/7700:.1f} kg lemak")
+            
+            st.write("")
+            st.info("Simulasi ini membantu memvisualisasikan bagaimana konsumsi rutin produk dengan profil gizi di atas dapat menumpuk dan berdampak pada tubuh Anda seiring waktu (asumsi 1 sendok makan gula = 15g, 7700 kalori surplus = 1 kg lemak tubuh).")
+            
+            st.markdown("---")
+            st.markdown("#### Profil & Analisis Produk Dasar")
+            col_simA, col_simB = st.columns(2, gap="large")
+            with col_simA:
+                render_analysis_side(res_sim)
+            with col_simB:
+                render_holistic_nutrition_profile(res_sim["nutrition_data"], res_sim["takaran_saji"])
+                
+            st.markdown("---")
+            risk_info_sim = res_sim.get("risk_info", classify_risk(res_sim.get("risk_score", 0)))
+            render_recommendation_details(risk_info_sim, res_sim.get("recommendation", ""), res_sim.get("is_upf"), res_sim.get("upf_flags", []))
+            
+            st.markdown("---")
+            render_health_metrics(res_sim["nutrition_data"], res_sim["takaran_saji"], current_threshold, show_header=True)
+        else:
+            st.error("Silakan lengkapi data nutrisi produk untuk menjalankan simulasi.")
 
 
 elif app_mode == "Riwayat Analisis":
