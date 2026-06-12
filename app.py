@@ -978,12 +978,16 @@ def input_form(prefix, defaults):
     return product_name, takaran_saji, nutrition_data, komposisi
 
 
-# --- FITUR BARU: HEADER BANNER ---
+# --- FITUR BARU: HEADER BANNER YANG RAPI ---
 try:
-    st.image("assets/Header Smart NutriScan AI.png", width=800)
+    # Membagi layout jadi 3 kolom agar gambar tetap di tengah dan ukurannya tidak memakan pinggir layar (seperti standard web header)
+    col_hdr1, col_hdr2, col_hdr3 = st.columns([1, 4, 1])
+    with col_hdr2:
+        st.image("assets/Header Smart NutriScan AI.png", use_container_width=True)
 except Exception:
     pass
-# ----------------------------------
+# ---------------------------------------------
+
 
 with st.sidebar:
     try:
