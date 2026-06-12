@@ -1202,7 +1202,6 @@ elif app_mode == "Analisis Batch Excel":
             try:
                 st.markdown("---")
                 st.markdown("### 2. Grafik Distribusi Risiko")
-                st.caption("Tambahkan chart otomatis setelah analisis selesai.")
 
                 df_results = st.session_state.batch_result_df.copy()
                 
@@ -1216,7 +1215,6 @@ elif app_mode == "Analisis Batch Excel":
 
                     # === PIE CHART ===
                     st.markdown("#### Proporsi Klasifikasi Produk")
-                    st.write("Menunjukkan persentase produk dalam kategori Aman, Sedang, dan Tinggi.")
                     
                     pie_data = valid_df["Klasifikasi"].value_counts().reset_index()
                     pie_data.columns = ["Klasifikasi", "Jumlah"]
@@ -1244,7 +1242,6 @@ elif app_mode == "Analisis Batch Excel":
 
                     # === BAR CHART HTML ===
                     st.markdown("#### Peringkat Skor Risiko Produk")
-                    st.write("Menampilkan tingkat risiko dari tiap produk secara spesifik:")
                     
                     bar_data = valid_df.sort_values(by="Skor Risiko Numerik", ascending=False)
                     
@@ -1263,14 +1260,12 @@ elif app_mode == "Analisis Batch Excel":
                     html_bars += "</div>"
                     
                     st.markdown(html_bars, unsafe_allow_html=True)
-                    st.caption("Pengguna lebih mudah memahami hasil.")
                     
                 else:
                     st.info("Tidak ada data valid yang bisa divisualisasikan dalam grafik.")
                     
                 st.markdown("---")
                 st.markdown("### 🎯 Detail Pemenuhan Angka Kecukupan Gizi Harian per Produk")
-                st.caption("Klik (*expand*) pada nama produk untuk melihat rincian pemenuhan batas harian.")
                 
                 for idx, row in valid_df.iterrows():
                     prod_name = row.get("Nama Produk", "Produk")
