@@ -779,6 +779,7 @@ def render_analysis_bottom(analysis_result, current_threshold):
     render_health_metrics(nutrition_data, takaran_saji, current_threshold, show_header=True)
 
 
+# --- Update: Record ALL inputs into history dataframe ---
 def store_product_analysis_result(product_name, takaran_saji, nutrition_data, komposisi, store_key, input_signature=None):
     analysis_result = build_analysis_result(product_name, takaran_saji, nutrition_data, komposisi)
     analysis_result["input_signature"] = input_signature or make_analysis_signature(product_name, takaran_saji, nutrition_data, komposisi)
@@ -788,12 +789,25 @@ def store_product_analysis_result(product_name, takaran_saji, nutrition_data, ko
     if analysis_result.get("status") == "ok":
         risk_score = analysis_result["risk_score"]
         risk_info = analysis_result["risk_info"]
+        
+        # Save flattened history for robust dataframe representation
         st.session_state.scan_history.append({
-            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "product_name": analysis_result["product_name"],
-            "risk_score": round(risk_score, 2),
-            "classification": risk_info["label"],
-            "nutrition": nutrition_data,
+            "Waktu Analisis": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Nama Produk": analysis_result["product_name"],
+            "Skor Risiko (%)": round(risk_score, 2),
+            "Klasifikasi": risk_info["label"],
+            "Takaran Saji (g/ml)": analysis_result["takaran_saji"],
+            "Energi (kkal)": nutrition_data.get("energi", 0),
+            "Lemak Total (g)": nutrition_data.get("lemak_total", 0),
+            "Lemak Jenuh (g)": nutrition_data.get("lemak_jenuh", 0),
+            "Protein (g)": nutrition_data.get("protein", 0),
+            "Karbohidrat (g)": nutrition_data.get("karbohidrat", 0),
+            "Gula (g)": nutrition_data.get("gula", 0),
+            "Garam (g)": nutrition_data.get("garam", 0),
+            "Natrium (mg)": nutrition_data.get("natrium", 0),
+            "Natrium Benzoat (mg)": nutrition_data.get("natrium_benzoat", 0),
+            "Komposisi": analysis_result["komposisi"],
+            "Rekomendasi": analysis_result.get("recommendation", "")
         })
 
     return analysis_result
@@ -1669,10 +1683,26 @@ elif app_mode == "Simulasi Konsumsi Produk":
             st.error("Silakan lengkapi data nutrisi produk untuk menjalankan simulasi.")
 
 
+# --- Update Bagian Riwayat Analisis ---
 elif app_mode == "Riwayat Analisis":
     st.header("Riwayat Analisis")
+    st.write("Daftar lengkap riwayat analisis produk yang dilakukan pada sesi ini.")
+    
     if st.session_state.scan_history:
-        st.dataframe(pd.DataFrame(st.session_state.scan_history), use_container_width=True)
+        df_hist = pd.DataFrame(st.session_state.scan_history)
+        st.dataframe(df_hist, use_container_width=True)
+        
+        st.markdown("---")
+        output_hist = io.BytesIO()
+        with pd.ExcelWriter(output_hist, engine="openpyxl") as writer:
+            df_hist.to_excel(writer, index=False, sheet_name="Riwayat Analisis")
+        
+        st.download_button(
+            label="📊 Download Riwayat (Excel)", 
+            data=output_hist.getvalue(), 
+            file_name="riwayat_analisis_nutriscan.xlsx",
+            use_container_width=True
+        )
     else:
         st.info("Belum ada riwayat analisis pada sesi ini.")
 
