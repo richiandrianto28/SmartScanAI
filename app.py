@@ -619,7 +619,7 @@ def generate_batch_insights(df_results):
     return insight
 
 
-# FITUR Export Report PDF
+# FITUR Export Report PDF untuk Batch Excel
 def generate_pdf_report(df_results, insight_text, fig_pie):
     from fpdf import FPDF
     
@@ -746,7 +746,10 @@ def generate_history_pdf_report(df_history):
             self.set_font('Arial', 'B', 16)
             self.set_text_color(15, 23, 42)
             self.cell(0, 10, 'Riwayat Analisis Lengkap - SMART NutriScan AI', 0, 1, 'C')
-            self.ln(5)
+            self.set_draw_color(200, 200, 200)
+            # Lebar tabel adalah 235mm. Margin kiri & kanan diset ke 31mm (31 + 235 = 266)
+            self.line(31, 22, 266, 22) 
+            self.ln(10)
             
         def footer(self):
             self.set_y(-15)
@@ -754,8 +757,11 @@ def generate_history_pdf_report(df_history):
             self.set_text_color(100, 100, 100)
             self.cell(0, 10, f'Halaman {self.page_no()}', 0, 0, 'C')
 
-    # Format Landscape A4
+    # Format Landscape A4 (297 mm x 210 mm)
     pdf = PDFReport(orientation='L', unit='mm', format='A4')
+    # Set margin 31mm agar tabel yang lebarnya 235mm bisa presisi di tengah
+    pdf.set_left_margin(31)
+    pdf.set_right_margin(31)
     pdf.add_page()
     
     pdf.set_font("Arial", 'B', 12)
@@ -780,6 +786,7 @@ def generate_history_pdf_report(df_history):
         klas = str(row.get('Klasifikasi', '-'))
         
         title = f"{idx+1}. {name}   |   Waktu: {waktu}   |   Skor Risiko: {skor} ({klas})"
+        # Mengunci lebar judul sama persis dengan tabel (total_table_width)
         pdf.cell(total_table_width, 8, title, 1, 1, 'L', fill=True)
         
         # Header Tabel Gizi
@@ -809,7 +816,7 @@ def generate_history_pdf_report(df_history):
             pdf.cell(col_w[i], 6, vals[i], 1, 0, 'C')
         pdf.ln()
         
-        # Simpan indentasi (margin kiri)
+        # Simpan indentasi (margin kiri) yang baru
         current_l_margin = pdf.l_margin
         
         # Komposisi
@@ -822,6 +829,7 @@ def generate_history_pdf_report(df_history):
         pdf.set_font("Arial", '', 8)
         komposisi = str(row.get('Komposisi', '-')).encode('latin-1', 'replace').decode('latin-1')
         komposisi = komposisi.replace('\n', ' ').replace('\r', '')
+        # Mengunci batas pembungkus teks (wrap) sama persis dengan ujung tabel gizi
         pdf.multi_cell(total_table_width - 25, 5, komposisi)
         
         # Kembalikan indentasi awal
@@ -837,6 +845,7 @@ def generate_history_pdf_report(df_history):
         pdf.set_font("Arial", '', 8)
         rekomendasi = str(row.get('Rekomendasi', '-')).encode('latin-1', 'replace').decode('latin-1')
         rekomendasi = rekomendasi.replace('\n', ' ').replace('\r', '')
+        # Mengunci batas pembungkus teks (wrap) sama persis dengan ujung tabel gizi
         pdf.multi_cell(total_table_width - 25, 5, rekomendasi)
         
         # Kembalikan indentasi awal
@@ -1811,6 +1820,7 @@ elif app_mode == "Simulasi Konsumsi Produk":
             st.error("Silakan lengkapi data nutrisi produk untuk menjalankan simulasi.")
 
 
+# --- Update Bagian Riwayat Analisis ---
 elif app_mode == "Riwayat Analisis":
     st.header("Riwayat Analisis")
     st.write("Daftar lengkap riwayat analisis produk yang dilakukan pada sesi ini.")
