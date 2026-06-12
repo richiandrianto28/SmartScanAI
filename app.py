@@ -956,7 +956,8 @@ if app_mode == "Analisis Produk Tunggal":
             st.success("Analisis berhasil diperbarui. Hasil ditampilkan di panel kanan.")
 
     with manual_result_col:
-        st.subheader("Hasil Analisis AI (Prediksi Risiko)")
+        st.markdown("### Profil & Analisis Produk Dasar")
+        st.caption("Ringkasan prediksi risiko dan kontribusi nutrisi utama.")
         render_analysis_side(st.session_state.manual_analysis_result, current_signature=manual_signature)
 
     render_analysis_bottom(st.session_state.manual_analysis_result, current_threshold)
@@ -1076,7 +1077,8 @@ elif app_mode == "Scan from Image":
             st.success("Analisis berhasil diperbarui. Hasil ditampilkan di panel kanan.")
 
     with result_col:
-        st.subheader("Hasil Analisis AI (Prediksi Risiko)")
+        st.markdown("### Profil & Analisis Produk Dasar")
+        st.caption("Ringkasan prediksi risiko dan kontribusi nutrisi utama.")
         render_analysis_side(st.session_state.ocr_analysis_result, current_signature=ocr_signature)
         
     render_analysis_bottom(st.session_state.ocr_analysis_result, current_threshold)
@@ -1487,9 +1489,13 @@ elif app_mode == "Perbandingan Produk":
         row1_colA, row1_colB = st.columns(2, gap="large")
         with row1_colA:
             st.markdown(f"### Hasil: {res_a['product_name'] or 'Produk A'}")
+            st.markdown("#### Profil & Analisis Produk Dasar")
+            st.caption("Ringkasan prediksi risiko dan kontribusi nutrisi utama.")
             render_analysis_side(res_a)
         with row1_colB:
             st.markdown(f"### Hasil: {res_b['product_name'] or 'Produk B'}")
+            st.markdown("#### Profil & Analisis Produk Dasar")
+            st.caption("Ringkasan prediksi risiko dan kontribusi nutrisi utama.")
             render_analysis_side(res_b)
 
         if res_a.get("status") == "ok" and res_b.get("status") == "ok":
@@ -1609,25 +1615,42 @@ elif app_mode == "Simulasi Konsumsi Produk":
             st.markdown("---")
             st.markdown("### 📈 Hasil Simulasi")
             
-            total_weeks = sim_period * 4
+            total_days = sim_period * 30
+            total_weeks = total_days / 7
             total_servings = freq_weekly * total_weeks
             
             acc_sugar = float(nut_sim.get("gula", 0)) * total_servings
             acc_sodium = float(nut_sim.get("natrium", 0)) * total_servings
+            acc_sat_fat = float(nut_sim.get("lemak_jenuh", 0)) * total_servings
             acc_cal = float(nut_sim.get("energi", 0)) * total_servings
             
-            st.markdown("#### Dampak Akumulatif pada Tubuh Anda")
+            max_sugar = current_threshold["gula"] * total_days
+            max_sodium = current_threshold["natrium"] * total_days
+            max_sat_fat = current_threshold["lemak_jenuh"] * total_days
+            max_cal = current_threshold["kalori"] * total_days
+
+            st.markdown(f"#### Dampak Akumulatif Selama {sim_period} Bulan (~{total_days} hari)")
             c1, c2, c3 = st.columns(3)
-            c1.metric("Total Sajian Dikonsumsi", f"{int(total_servings)} porsi", f"Dalam {sim_period} bulan")
-            c2.metric("Total Gula Menumpuk", f"{acc_sugar:.1f} g", f"Setara ~ {acc_sugar/15:.1f} sdm gula")
-            c3.metric("Total Kalori Ekstra", f"{acc_cal:.1f} kkal", f"Setara ~ {acc_cal/7700:.1f} kg lemak")
-            
+            c1.metric("Total Sajian Dikonsumsi", f"{int(total_servings)} porsi", f"{freq_weekly}x seminggu")
+            c2.metric("Total Gula dari Produk", f"{acc_sugar:.1f} g", f"Setara ~ {acc_sugar/15:.1f} sdm gula")
+            c3.metric("Total Kalori dari Produk", f"{acc_cal:.1f} kkal", f"Setara ~ {acc_cal/7700:.1f} kg lemak")
+
             st.write("")
-            st.info("Simulasi ini membantu memvisualisasikan bagaimana konsumsi rutin produk dengan profil gizi di atas dapat menumpuk dan berdampak pada tubuh Anda seiring waktu (asumsi 1 sendok makan gula = 15g, 7700 kalori surplus = 1 kg lemak tubuh).")
+            st.markdown("##### ⚠️ Persentase Konsumsi Terhadap Batas Maksimal (Angka Kecukupan Gizi) Anda dalam Periode Ini:")
+            
+            gula_pct = (acc_sugar / max_sugar * 100) if max_sugar else 0
+            natrium_pct = (acc_sodium / max_sodium * 100) if max_sodium else 0
+            lemak_jenuh_pct = (acc_sat_fat / max_sat_fat * 100) if max_sat_fat else 0
+            kalori_pct = (acc_cal / max_cal * 100) if max_cal else 0
+
+            custom_progress_bar("Kalori yang Dihabiskan", acc_cal, max_cal, "kkal", "#10B981", kalori_pct)
+            custom_progress_bar("Batas Gula yang Dihabiskan", acc_sugar, max_sugar, "g", "#F59E0B", gula_pct)
+            custom_progress_bar("Batas Natrium yang Dihabiskan", acc_sodium, max_sodium, "mg", "#3498DB", natrium_pct)
+            custom_progress_bar("Batas Lemak Jenuh yang Dihabiskan", acc_sat_fat, max_sat_fat, "g", "#9B59B6", lemak_jenuh_pct)
+            
+            st.info("Simulasi di atas menunjukkan seberapa besar jatah nutrisi Anda yang **habis hanya oleh satu jenis produk ini saja** selama periode simulasi. Idealnya, camilan atau minuman tunggal tidak boleh mendominasi batas asupan harian/bulanan Anda.")
             
             st.markdown("---")
-            
-            # MENGUNCI POSISI AGAR JUDUL DAN KONTEN SEJAJAR SECARA HORIZONTAL
             col_simA, col_simB = st.columns(2, gap="large")
             with col_simA:
                 st.markdown("### 📋 Profil & Analisis Produk Dasar")
