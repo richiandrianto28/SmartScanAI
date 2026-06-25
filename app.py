@@ -29,6 +29,21 @@ st.set_page_config(
     layout="wide",
 )
 
+# --- BILINGUAL HELPER ---
+if "lang" not in st.session_state:
+    st.session_state.lang = "ID"
+
+def t(id_text, en_text):
+    """Fungsi helper untuk terjemahan string UI."""
+    return id_text if st.session_state.lang == "ID" else en_text
+
+def tr_risk(label):
+    """Menerjemahkan label risiko khusus bahasa Inggris."""
+    if st.session_state.lang == "ID":
+        return label
+    mapping = {"Aman": "Safe", "Sedang": "Moderate", "Tinggi": "High", "Belum dianalisis": "Not analyzed"}
+    return mapping.get(label, label)
+
 
 if "scan_history" not in st.session_state:
     st.session_state.scan_history = []
@@ -151,22 +166,22 @@ def render_ocr_result_debug(scan_result, label):
     quality_warnings = scan_result.get("quality_warnings", [])
 
     if quality_warnings:
-        with st.expander(f"Catatan kualitas OCR {label}", expanded=False):
+        with st.expander(t(f"Catatan kualitas OCR {label}", f"OCR quality notes for {label}"), expanded=False):
             for item in quality_warnings:
                 st.warning(item)
 
     if errors:
-        with st.expander(f"Catatan error OCR {label}", expanded=False):
+        with st.expander(t(f"Catatan error OCR {label}", f"OCR error notes for {label}"), expanded=False):
             for item in errors:
                 st.warning(item)
 
-    with st.expander(f"Lihat teks OCR {label}", expanded=False):
-        st.caption(f"Variasi gambar terbaik: {scan_result.get('best_variant', 'tidak diketahui')}")
-        st.text(scan_result.get("raw_text") or "Tidak ada teks terbaca")
+    with st.expander(t(f"Lihat teks OCR {label}", f"View OCR text for {label}"), expanded=False):
+        st.caption(t(f"Variasi gambar terbaik: {scan_result.get('best_variant', 'tidak diketahui')}", f"Best image variant: {scan_result.get('best_variant', 'unknown')}"))
+        st.text(scan_result.get("raw_text") or t("Tidak ada teks terbaca", "No text readable"))
 
-    with st.expander(f"Ringkasan variasi preprocessing {label}", expanded=False):
+    with st.expander(t(f"Ringkasan variasi preprocessing {label}", f"Preprocessing variants summary for {label}"), expanded=False):
         names = list(scan_result.get("variants", {}).keys())
-        st.write(names if names else "Tidak ada variasi gambar tersimpan.")
+        st.write(names if names else t("Tidak ada variasi gambar tersimpan.", "No image variants saved."))
 
 
 NUTRITION_KEYS = [
@@ -240,6 +255,12 @@ EXAMPLE_PRESETS = {
     },
 }
 
+EN_PRESET_NAMES = {
+    "Kosong": "Empty",
+    "Contoh Aman (Susu Gandum)": "Safe Example (Oat Milk)",
+    "Contoh Sedang (Biskuit Cokelat)": "Moderate Example (Chocolate Biscuit)",
+    "Contoh Tinggi (Keripik Ekstra Pedas)": "High Example (Extra Spicy Chips)"
+}
 
 def apply_manual_preset():
     preset_name = st.session_state.preset_selector
@@ -277,17 +298,17 @@ if "manual_analysis_result" not in st.session_state:
 
 
 def hitung_tdee_dinamis(gender, usia, berat, tinggi, aktivitas):
-    if gender == "Pria":
+    if gender in ["Pria", "Male"]:
         bmr = (10 * berat) + (6.25 * tinggi) - (5 * usia) + 5
     else:
         bmr = (10 * berat) + (6.25 * tinggi) - (5 * usia) - 161
 
     faktor = {
         "Sedentary": 1.2,
-        "Ringan": 1.375,
-        "Sedang": 1.55,
-        "Aktif": 1.725,
-        "Sangat Aktif": 1.9,
+        "Ringan": 1.375, "Light": 1.375,
+        "Sedang": 1.55, "Moderate": 1.55,
+        "Aktif": 1.725, "Active": 1.725,
+        "Sangat Aktif": 1.9, "Very Active": 1.9,
     }
 
     tdee = bmr * faktor.get(aktivitas, 1.2)
@@ -317,15 +338,17 @@ def build_nutrition_data(
 
 def render_risk_status(risk_score):
     risk_info = classify_risk(risk_score)
-    st.metric("Skor Risiko Prediksi", f"{risk_score:.2f}%")
-    st.metric("Klasifikasi", risk_info["label"])
+    label_tr = tr_risk(risk_info["label"])
+    
+    st.metric(t("Skor Risiko Prediksi", "Predicted Risk Score"), f"{risk_score:.2f}%")
+    st.metric(t("Klasifikasi", "Classification"), label_tr)
 
     if risk_info["style"] == "success":
-        st.success(f"Klasifikasi {risk_info['label']}")
+        st.success(f"{t('Klasifikasi', 'Classification')} {label_tr}")
     elif risk_info["style"] == "warning":
-        st.warning(f"Klasifikasi {risk_info['label']}")
+        st.warning(f"{t('Klasifikasi', 'Classification')} {label_tr}")
     else:
-        st.error(f"Klasifikasi {risk_info['label']}")
+        st.error(f"{t('Klasifikasi', 'Classification')} {label_tr}")
 
 
 def render_xai_radar(xai_factors):
@@ -337,19 +360,19 @@ def render_xai_radar(xai_factors):
     for key, value in xai_factors.items():
         key_lower = key.lower()
         value = float(value or 0)
-        if "gula" in key_lower:
+        if "gula" in key_lower or "sugar" in key_lower:
             norm_values.append(min((value / 45) * 100, 100))
         elif "natrium" in key_lower and "benzoat" not in key_lower:
             norm_values.append(min((value / 1500) * 100, 100))
         elif "benzoat" in key_lower:
             norm_values.append(min((value / 300) * 100, 100))
-        elif "lemak total" in key_lower:
+        elif "lemak total" in key_lower or "fat" in key_lower:
             norm_values.append(min((value / 30) * 100, 100))
-        elif "lemak jenuh" in key_lower:
+        elif "lemak jenuh" in key_lower or "saturated" in key_lower:
             norm_values.append(min((value / 14) * 100, 100))
-        elif "energi" in key_lower:
+        elif "energi" in key_lower or "energy" in key_lower:
             norm_values.append(min((value / 550) * 100, 100))
-        elif "karbohidrat" in key_lower:
+        elif "karbohidrat" in key_lower or "carbo" in key_lower:
             norm_values.append(min((value / 75) * 100, 100))
         else:
             norm_values.append(min((value / 100) * 100, 100))
@@ -363,7 +386,7 @@ def render_xai_radar(xai_factors):
             fillcolor="rgba(79, 70, 229, 0.4)",
             line=dict(color="#4F46E5", width=2.5),
             marker=dict(symbol="circle", size=8, color="#312E81"),
-            name="Kandungan Produk",
+            name=t("Kandungan Produk", "Product Content"),
             hoverinfo="r+theta"
         )
     )
@@ -392,7 +415,7 @@ def render_xai_radar(xai_factors):
 
 
 def render_recommendation_details(risk_info, recommendation_text, is_upf, upf_flags):
-    st.markdown("### Rekomendasi")
+    st.markdown(t("### Rekomendasi", "### Recommendation"))
     
     if risk_info["style"] == "success":
         st.info(f"{recommendation_text}")
@@ -402,17 +425,21 @@ def render_recommendation_details(risk_info, recommendation_text, is_upf, upf_fl
         st.error(f"{recommendation_text}")
 
     if is_upf:
-        st.error("Indikasi bahan ultra proses terdeteksi")
+        st.error(t("Indikasi bahan ultra proses terdeteksi", "Ultra-processed food ingredients detected"))
         st.write(", ".join(upf_flags))
         
     st.markdown("---")
     
-    with st.expander("ℹ️ Detail Penjelasan Klasifikasi Nutrisi", expanded=False):
-        st.markdown("""
+    with st.expander(t("ℹ️ Detail Penjelasan Klasifikasi Nutrisi", "ℹ️ Nutrition Classification Details"), expanded=False):
+        st.markdown(t("""
         * 🟢 **Aman (0 - 34.99):** Produk relatif aman dan sehat. Cocok untuk dikonsumsi dalam porsi wajar sebagai bagian dari asupan nutrisi harian Anda.
         * 🟡 **Sedang (35 - 69.99):** Kandungan produk memiliki beberapa catatan (misal: kalori cukup padat atau ada gula tambahan). Boleh dikonsumsi sesekali, namun bukan untuk konsumsi utama harian yang berulang-ulang.
         * 🔴 **Tinggi (70 - 100):** Sangat disarankan untuk dibatasi. Produk ini kemungkinan besar padat energi tanpa nutrisi bermanfaat (empty calories), tinggi gula/garam, atau merupakan produk *ultra-processed*.
-        """)
+        """, """
+        * 🟢 **Safe (0 - 34.99):** Product is relatively safe and healthy. Suitable for consumption in reasonable portions as part of your daily nutritional intake.
+        * 🟡 **Moderate (35 - 69.99):** Product content has some remarks (e.g., quite calorie-dense or added sugars). Okay to consume occasionally, but not as a repeated daily staple.
+        * 🔴 **High (70 - 100):** Highly recommended to limit. This product is likely energy-dense without beneficial nutrients (empty calories), high in sugar/salt, or is an *ultra-processed* product.
+        """))
 
 
 def render_nutrition_kepadatan_gula(nutrition_data, takaran_saji):
@@ -426,30 +453,30 @@ def render_nutrition_kepadatan_gula(nutrition_data, takaran_saji):
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("**Kepadatan Energi (kkal/gram)**")
+        st.markdown(t("**Kepadatan Energi (kkal/gram)**", "**Energy Density (kcal/gram)**"))
         st.markdown(f"## {kepadatan:.1f}")
         if kepadatan > 4.0:
-            st.error("↑ 🔴 Sangat Tinggi (Padat Kalori)")
-            st.caption("Menunjukkan seberapa padat kalori dalam produk ini. Kepadatan tinggi memicu obesitas jika tidak dikontrol.")
+            st.error(t("↑ 🔴 Sangat Tinggi (Padat Kalori)", "↑ 🔴 Very High (Calorie Dense)"))
+            st.caption(t("Menunjukkan seberapa padat kalori dalam produk ini. Kepadatan tinggi memicu obesitas jika tidak dikontrol.", "Indicates how calorie-dense the product is. High density triggers obesity if uncontrolled."))
         elif kepadatan >= 1.5:
-            st.warning("— 🟡 Sedang")
-            st.caption("Kepadatan kalori moderat. Perhatikan porsi konsumsi Anda.")
+            st.warning(t("— 🟡 Sedang", "— 🟡 Moderate"))
+            st.caption(t("Kepadatan kalori moderat. Perhatikan porsi konsumsi Anda.", "Moderate calorie density. Watch your consumption portion."))
         else:
-            st.success("↓ 🟢 Rendah Kalori")
-            st.caption("Produk ini memiliki kepadatan energi yang rendah, baik untuk mengontrol asupan kalori.")
+            st.success(t("↓ 🟢 Rendah Kalori", "↓ 🟢 Low Calorie"))
+            st.caption(t("Produk ini memiliki kepadatan energi yang rendah, baik untuk mengontrol asupan kalori.", "This product has low energy density, good for controlling calorie intake."))
 
     with col2:
-        st.markdown("**Rasio Gula dari Total Karbohidrat**")
+        st.markdown(t("**Rasio Gula dari Total Karbohidrat**", "**Sugar Ratio of Total Carbohydrates**"))
         st.markdown(f"## {rasio_gula:.1f}%")
         if rasio_gula > 50:
-            st.error("↑ 🔴 Tinggi Gula Sederhana")
-            st.caption("Jika >50%, sebagian besar karbohidrat adalah gula sederhana yang bisa memicu lonjakan gula darah (*sugar spike*).")
+            st.error(t("↑ 🔴 Tinggi Gula Sederhana", "↑ 🔴 High in Simple Sugars"))
+            st.caption(t("Jika >50%, sebagian besar karbohidrat adalah gula sederhana yang bisa memicu lonjakan gula darah (*sugar spike*).", "If >50%, most carbohydrates are simple sugars that can trigger a blood sugar spike."))
         elif rasio_gula >= 20:
-            st.warning("— 🟡 Sedang")
-            st.caption("Mengandung gula sederhana dalam jumlah sedang.")
+            st.warning(t("— 🟡 Sedang", "— 🟡 Moderate"))
+            st.caption(t("Mengandung gula sederhana dalam jumlah sedang.", "Contains simple sugars in moderate amounts."))
         else:
-            st.success("↓ 🟢 Rendah Gula")
-            st.caption("Sebagian besar karbohidrat berasal dari sumber kompleks yang lebih lama dicerna.")
+            st.success(t("↓ 🟢 Rendah Gula", "↓ 🟢 Low Sugar"))
+            st.caption(t("Sebagian besar karbohidrat berasal dari sumber kompleks yang lebih lama dicerna.", "Most carbohydrates come from complex sources that digest slower."))
 
 
 def render_nutrition_pie_chart(nutrition_data):
@@ -463,7 +490,11 @@ def render_nutrition_pie_chart(nutrition_data):
     total_kal_makro = kalori_lemak + kalori_karbo + kalori_protein
 
     if total_kal_makro > 0:
-        labels = ['Lemak (9 kkal/g)', 'Karbohidrat (4 kkal/g)', 'Protein (4 kkal/g)']
+        labels = [
+            t('Lemak (9 kkal/g)', 'Fat (9 kcal/g)'), 
+            t('Karbohidrat (4 kkal/g)', 'Carbohydrate (4 kcal/g)'), 
+            t('Protein (4 kkal/g)', 'Protein (4 kcal/g)')
+        ]
         values = [kalori_lemak, kalori_karbo, kalori_protein]
         colors = ['#E74C3C', '#2ECC71', '#3498DB'] 
 
@@ -472,15 +503,15 @@ def render_nutrition_pie_chart(nutrition_data):
         fig.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10), height=350)
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("Data makronutrien kosong atau bernilai nol. Isi Lemak, Karbohidrat, dan Protein untuk melihat rasio kalori.")
+        st.info(t("Data makronutrien kosong atau bernilai nol. Isi Lemak, Karbohidrat, dan Protein untuk melihat rasio kalori.", "Macronutrient data is empty or zero. Fill in Fat, Carbohydrate, and Protein to see calorie ratios."))
 
 
 def render_holistic_nutrition_profile(nutrition_data, takaran_saji):
-    st.markdown("### 📊 Profil Gizi & Makronutrien Holistik")
-    st.caption("Analisis mendalam mengenai sumber kalori dan dampak glikemik berdasarkan takaran saji.")
+    st.markdown(t("### 📊 Profil Gizi & Makronutrien Holistik", "### 📊 Holistic Nutrition & Macronutrient Profile"))
+    st.caption(t("Analisis mendalam mengenai sumber kalori dan dampak glikemik berdasarkan takaran saji.", "In-depth analysis of calorie sources and glycemic impact based on serving size."))
     render_nutrition_kepadatan_gula(nutrition_data, takaran_saji)
     st.write("")
-    st.markdown("**Distribusi Sumber Kalori (Macronutrient Split)**")
+    st.markdown(t("**Distribusi Sumber Kalori (Macronutrient Split)**", "**Calorie Source Distribution (Macronutrient Split)**"))
     render_nutrition_pie_chart(nutrition_data)
 
 
@@ -490,7 +521,8 @@ def custom_progress_bar(label, current_val, max_val, unit, color, percentage):
     warning_text = ""
     if percentage > 100:
         color = "#E74C3C" 
-        warning_text = "<span style='color:#E74C3C; font-weight:bold; font-size: 0.9em; margin-left: 5px;'>(Melebihi Batas!)</span>"
+        w_txt = t("Melebihi Batas!", "Exceeds Limit!")
+        warning_text = f"<span style='color:#E74C3C; font-weight:bold; font-size: 0.9em; margin-left: 5px;'>({w_txt})</span>"
 
     html_code = f"<div style='margin-bottom: 24px; font-family: \"Inter\", \"Segoe UI\", sans-serif;'><div style='display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;'><span style='font-weight: 600; font-size: 15px; color: #0F172A;'>{label}</span><span style='color: #475569; font-size: 14px;'><span style='font-weight: 700; color: #1E293B;'>{current_val:.2f}</span> / {max_val:.2f} {unit} <span style='color: #64748B; margin-left: 4px;'>({percentage:.1f}%)</span>{warning_text}</span></div><div style='width: 100%; background-color: #E2E8F0; border-radius: 8px; height: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);'><div style='width: {display_pct}%; background-color: {color}; height: 100%; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: width 0.8s ease-out;'></div></div></div>"
     st.markdown(html_code, unsafe_allow_html=True)
@@ -498,8 +530,8 @@ def custom_progress_bar(label, current_val, max_val, unit, color, percentage):
 
 def render_health_metrics(nutrition_data, takaran_saji, current_threshold, show_header=True):
     if show_header:
-        st.markdown("### 🎯 Pemenuhan Angka Kecukupan Gizi Harian")
-        st.caption("Berdasarkan profil pengguna dan batas ambang kesehatan medis Anda:")
+        st.markdown(t("### 🎯 Pemenuhan Angka Kecukupan Gizi Harian", "### 🎯 Fulfillment of Daily Nutritional Adequacy"))
+        st.caption(t("Berdasarkan profil pengguna dan batas ambang kesehatan medis Anda:", "Based on your user profile and medical health thresholds:"))
         st.write("")
 
     gula = float(nutrition_data.get("gula", 0))
@@ -510,9 +542,9 @@ def render_health_metrics(nutrition_data, takaran_saji, current_threshold, show_
     natrium_pct = (natrium / current_threshold["natrium"] * 100) if current_threshold["natrium"] else 0
     lemak_jenuh_pct = (lemak_jenuh / current_threshold["lemak_jenuh"] * 100) if current_threshold["lemak_jenuh"] else 0
 
-    custom_progress_bar("Gula", gula, current_threshold["gula"], "g", "#F59E0B", gula_pct)
-    custom_progress_bar("Natrium", natrium, current_threshold["natrium"], "mg", "#3498DB", natrium_pct)
-    custom_progress_bar("Lemak Jenuh", lemak_jenuh, current_threshold["lemak_jenuh"], "g", "#9B59B6", lemak_jenuh_pct)
+    custom_progress_bar(t("Gula", "Sugar"), gula, current_threshold["gula"], "g", "#F59E0B", gula_pct)
+    custom_progress_bar(t("Natrium", "Sodium"), natrium, current_threshold["natrium"], "mg", "#3498DB", natrium_pct)
+    custom_progress_bar(t("Lemak Jenuh", "Saturated Fat"), lemak_jenuh, current_threshold["lemak_jenuh"], "g", "#9B59B6", lemak_jenuh_pct)
 
 
 def make_analysis_signature(product_name, takaran_saji, nutrition_data, komposisi):
@@ -531,9 +563,9 @@ def build_analysis_result(product_name, takaran_saji, nutrition_data, komposisi)
     if not has_sufficient_input(nutrition_data):
         return {
             "status": "insufficient",
-            "message": "Data belum cukup untuk dianalisis. Isi atau koreksi minimal satu nilai gizi yang valid sebelum menjalankan rekomendasi.",
-            "integrity_note": "Sistem tidak memberi label tinggi, sedang, atau aman ketika data masih kosong. Ini menjaga integritas hasil analisis.",
-            "product_name": product_name or "Produk Tanpa Nama",
+            "message": t("Data belum cukup untuk dianalisis. Isi atau koreksi minimal satu nilai gizi yang valid sebelum menjalankan rekomendasi.", "Insufficient data for analysis. Fill in or correct at least one valid nutritional value before running recommendations."),
+            "integrity_note": t("Sistem tidak memberi label tinggi, sedang, atau aman ketika data masih kosong. Ini menjaga integritas hasil analisis.", "System does not label high, moderate, or safe when data is empty. This preserves analysis integrity."),
+            "product_name": product_name or t("Produk Tanpa Nama", "Unnamed Product"),
             "takaran_saji": float(takaran_saji or 0),
             "nutrition_data": nutrition_data,
             "komposisi": komposisi,
@@ -552,7 +584,7 @@ def build_analysis_result(product_name, takaran_saji, nutrition_data, komposisi)
 
     return {
         "status": "ok",
-        "product_name": product_name or "Produk Tanpa Nama",
+        "product_name": product_name or t("Produk Tanpa Nama", "Unnamed Product"),
         "takaran_saji": float(takaran_saji or 0),
         "nutrition_data": nutrition_data,
         "komposisi": komposisi,
@@ -565,61 +597,68 @@ def build_analysis_result(product_name, takaran_saji, nutrition_data, komposisi)
     }
 
 
-# FITUR AI Insight Generator
 def generate_batch_insights(df_results):
     if df_results is None or df_results.empty:
-        return "Belum ada data untuk dianalisis."
+        return t("Belum ada data untuk dianalisis.", "No data to analyze yet.")
 
     valid_df = df_results.copy()
     valid_df["Skor Risiko Numerik"] = pd.to_numeric(valid_df["Skor Risiko"], errors='coerce')
     valid_df = valid_df.dropna(subset=["Skor Risiko Numerik"])
 
     if valid_df.empty:
-        return "Data tidak valid untuk membuat ringkasan AI."
+        return t("Data tidak valid untuk membuat ringkasan AI.", "Data is invalid for creating AI summary.")
 
     total_products = len(valid_df)
     aman_count = len(valid_df[valid_df["Klasifikasi"] == "Aman"])
     pct_aman = (aman_count / total_products) * 100 if total_products > 0 else 0
 
     highest_risk_row = valid_df.loc[valid_df["Skor Risiko Numerik"].idxmax()]
-    highest_name = highest_risk_row.get("Nama Produk", "Produk Tidak Diketahui")
+    highest_name = highest_risk_row.get("Nama Produk", t("Produk Tidak Diketahui", "Unknown Product"))
     highest_score = highest_risk_row["Skor Risiko Numerik"]
 
     avg_score = valid_df["Skor Risiko Numerik"].mean()
     if avg_score < 35:
-        avg_cat = "rendah hingga sedang"
+        avg_cat = t("rendah hingga sedang", "low to moderate")
     elif avg_score < 70:
-        avg_cat = "sedang hingga tinggi"
+        avg_cat = t("sedang hingga tinggi", "moderate to high")
     else:
-        avg_cat = "tinggi"
+        avg_cat = t("tinggi", "high")
 
-    reason_text = "kandungan komposisi gizinya"
+    reason_text = t("kandungan komposisi gizinya", "its nutritional composition")
     if "nutrition_data" in highest_risk_row and isinstance(highest_risk_row["nutrition_data"], dict):
         nut_data = highest_risk_row["nutrition_data"]
         high_factors = []
         
         if float(nut_data.get("natrium", 0)) > 300: high_factors.append("natrium")
         if float(nut_data.get("gula", 0)) > 12: high_factors.append("gula")
-        if float(nut_data.get("lemak_total", 0)) > 10: high_factors.append("lemak")
-        if float(nut_data.get("lemak_jenuh", 0)) > 4: high_factors.append("lemak jenuh")
+        if float(nut_data.get("lemak_total", 0)) > 10: high_factors.append(t("lemak", "fat"))
+        if float(nut_data.get("lemak_jenuh", 0)) > 4: high_factors.append(t("lemak jenuh", "saturated fat"))
         
         if high_factors:
             if len(high_factors) > 1:
-                reason_text = f"kandungan {', '.join(high_factors[:-1])} dan {high_factors[-1]} yang relatif tinggi"
+                dan = t("dan", "and")
+                reason_text = t(f"kandungan {', '.join(high_factors[:-1])} {dan} {high_factors[-1]} yang relatif tinggi", 
+                                f"relatively high {', '.join(high_factors[:-1])} {dan} {high_factors[-1]} content")
             else:
-                reason_text = f"kandungan {high_factors[0]} yang relatif tinggi"
+                reason_text = t(f"kandungan {high_factors[0]} yang relatif tinggi", 
+                                f"relatively high {high_factors[0]} content")
 
-    insight = (
+    insight = t(
         f"Dari **{total_products} produk** yang dianalisis, **{pct_aman:.1f}%** termasuk kategori aman. "
         f"Produk dengan skor risiko tertinggi adalah **{highest_name}** ({highest_score:.2f}), "
         f"terutama dipengaruhi oleh {reason_text}. "
         f"Secara keseluruhan, rata-rata skor risiko batch ini adalah **{avg_score:.1f}** yang menunjukkan "
-        f"tingkat risiko konsumsi berada pada kategori **{avg_cat}**."
+        f"tingkat risiko konsumsi berada pada kategori **{avg_cat}**.",
+        
+        f"Out of **{total_products} products** analyzed, **{pct_aman:.1f}%** fall into the safe category. "
+        f"The product with the highest risk score is **{highest_name}** ({highest_score:.2f}), "
+        f"primarily driven by {reason_text}. "
+        f"Overall, the average risk score for this batch is **{avg_score:.1f}**, indicating "
+        f"the consumption risk level is in the **{avg_cat}** category."
     )
     return insight
 
 
-# FITUR Export Report PDF untuk Batch Excel
 def generate_pdf_report(df_results, insight_text, fig_pie):
     from fpdf import FPDF
     
@@ -627,7 +666,7 @@ def generate_pdf_report(df_results, insight_text, fig_pie):
         def header(self):
             self.set_font('Arial', 'B', 16)
             self.set_text_color(15, 23, 42)
-            self.cell(0, 10, 'Laporan Analisis Batch - SMART NutriScan AI', 0, 1, 'C')
+            self.cell(0, 10, t('Laporan Analisis Batch - SMART NutriScan AI', 'Batch Analysis Report - SMART NutriScan AI'), 0, 1, 'C')
             self.set_draw_color(200, 200, 200)
             self.line(10, 22, 200, 22)
             self.ln(10)
@@ -636,7 +675,7 @@ def generate_pdf_report(df_results, insight_text, fig_pie):
             self.set_y(-15)
             self.set_font('Arial', 'I', 8)
             self.set_text_color(100, 100, 100)
-            self.cell(0, 10, f'Halaman {self.page_no()}', 0, 0, 'C')
+            self.cell(0, 10, t(f'Halaman {self.page_no()}', f'Page {self.page_no()}'), 0, 0, 'C')
 
     pdf = PDFReport()
     pdf.add_page()
@@ -644,7 +683,7 @@ def generate_pdf_report(df_results, insight_text, fig_pie):
     # 1. Ringkasan Eksekutif
     pdf.set_font("Arial", 'B', 12)
     pdf.set_text_color(30, 41, 59)
-    pdf.cell(0, 10, "1. Ringkasan Eksekutif", 0, 1)
+    pdf.cell(0, 10, t("1. Ringkasan Eksekutif", "1. Executive Summary"), 0, 1)
     
     pdf.set_font("Arial", '', 11)
     pdf.set_text_color(50, 50, 50)
@@ -656,7 +695,7 @@ def generate_pdf_report(df_results, insight_text, fig_pie):
     # 2. Statistik
     pdf.set_font("Arial", 'B', 12)
     pdf.set_text_color(30, 41, 59)
-    pdf.cell(0, 10, "2. Statistik Distribusi Risiko", 0, 1)
+    pdf.cell(0, 10, t("2. Statistik Distribusi Risiko", "2. Risk Distribution Statistics"), 0, 1)
     
     valid_df = df_results.dropna(subset=["Skor Risiko Numerik"])
     total = len(valid_df)
@@ -669,12 +708,18 @@ def generate_pdf_report(df_results, insight_text, fig_pie):
         
         pdf.set_font("Arial", '', 11)
         pdf.set_text_color(50, 50, 50)
-        stats_text = (
+        stats_text = t(
             f"- Total Produk Dianalisis: {total} produk\n"
             f"- Kategori Aman: {aman} produk ({(aman/total)*100:.1f}%)\n"
             f"- Kategori Sedang: {sedang} produk ({(sedang/total)*100:.1f}%)\n"
             f"- Kategori Tinggi: {tinggi} produk ({(tinggi/total)*100:.1f}%)\n"
-            f"- Rata-rata Skor Risiko Keseluruhan: {avg_score:.2f} / 100"
+            f"- Rata-rata Skor Risiko Keseluruhan: {avg_score:.2f} / 100",
+            
+            f"- Total Analyzed Products: {total} products\n"
+            f"- Safe Category: {aman} products ({(aman/total)*100:.1f}%)\n"
+            f"- Moderate Category: {sedang} products ({(sedang/total)*100:.1f}%)\n"
+            f"- High Category: {tinggi} products ({(tinggi/total)*100:.1f}%)\n"
+            f"- Overall Average Risk Score: {avg_score:.2f} / 100"
         )
         pdf.multi_cell(0, 7, stats_text)
     pdf.ln(5)
@@ -682,7 +727,7 @@ def generate_pdf_report(df_results, insight_text, fig_pie):
     # 3. Grafik Proporsi Klasifikasi
     pdf.set_font("Arial", 'B', 12)
     pdf.set_text_color(30, 41, 59)
-    pdf.cell(0, 10, "3. Grafik Proporsi Klasifikasi", 0, 1)
+    pdf.cell(0, 10, t("3. Grafik Proporsi Klasifikasi", "3. Classification Proportion Chart"), 0, 1)
     
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmpfile:
@@ -693,23 +738,23 @@ def generate_pdf_report(df_results, insight_text, fig_pie):
     except Exception as e:
         pdf.set_font("Arial", 'I', 10)
         pdf.set_text_color(200, 50, 50)
-        pdf.cell(0, 10, "(Grafik tidak dapat diekspor. Pastikan package 'kaleido' terinstall di backend.)", 0, 1)
+        pdf.cell(0, 10, t("(Grafik tidak dapat diekspor. Pastikan package 'kaleido' terinstall di backend.)", "(Chart cannot be exported. Ensure 'kaleido' package is installed in backend.)"), 0, 1)
         pdf.ln(5)
         
     # 4. Tabel Hasil Analisis
     pdf.add_page()
     pdf.set_font("Arial", 'B', 12)
     pdf.set_text_color(30, 41, 59)
-    pdf.cell(0, 10, "4. Detail Tabel Hasil Analisis", 0, 1)
+    pdf.cell(0, 10, t("4. Detail Tabel Hasil Analisis", "4. Detailed Analysis Results Table"), 0, 1)
     pdf.ln(2)
     
     # Table Header
     pdf.set_font("Arial", 'B', 10)
     pdf.set_fill_color(240, 244, 248)
     col_w = [110, 35, 45]
-    pdf.cell(col_w[0], 10, "Nama Produk", 1, 0, 'C', fill=True)
-    pdf.cell(col_w[1], 10, "Skor Risiko", 1, 0, 'C', fill=True)
-    pdf.cell(col_w[2], 10, "Klasifikasi", 1, 1, 'C', fill=True)
+    pdf.cell(col_w[0], 10, t("Nama Produk", "Product Name"), 1, 0, 'C', fill=True)
+    pdf.cell(col_w[1], 10, t("Skor Risiko", "Risk Score"), 1, 0, 'C', fill=True)
+    pdf.cell(col_w[2], 10, t("Klasifikasi", "Classification"), 1, 1, 'C', fill=True)
     
     # Table Content
     pdf.set_font("Arial", '', 10)
@@ -720,6 +765,7 @@ def generate_pdf_report(df_results, insight_text, fig_pie):
         if len(name) > 55: name = name[:52] + "..."
         skor = f"{row['Skor Risiko Numerik']:.2f}%"
         klas = str(row['Klasifikasi'])
+        klas = tr_risk(klas)
         
         name = name.encode('latin-1', 'replace').decode('latin-1')
         
@@ -727,7 +773,6 @@ def generate_pdf_report(df_results, insight_text, fig_pie):
         pdf.cell(col_w[1], 10, skor, 1, 0, 'C')
         pdf.cell(col_w[2], 10, klas, 1, 1, 'C')
 
-    # Convert PDF object to Bytes safely
     with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmpdf:
         pdf.output(tmpdf.name)
         with open(tmpdf.name, 'rb') as f:
@@ -737,7 +782,6 @@ def generate_pdf_report(df_results, insight_text, fig_pie):
     return pdf_bytes
 
 
-# FITUR BARU: PDF Generate History Lengkap tanpa Potong (Row-by-Row Card)
 def generate_history_pdf_report(df_history):
     from fpdf import FPDF
     
@@ -745,9 +789,8 @@ def generate_history_pdf_report(df_history):
         def header(self):
             self.set_font('Arial', 'B', 16)
             self.set_text_color(15, 23, 42)
-            self.cell(0, 10, 'Riwayat Analisis Lengkap - SMART NutriScan AI', 0, 1, 'C')
+            self.cell(0, 10, t('Riwayat Analisis Lengkap - SMART NutriScan AI', 'Complete Analysis History - SMART NutriScan AI'), 0, 1, 'C')
             self.set_draw_color(200, 200, 200)
-            # Lebar tabel adalah 235mm. Margin kiri & kanan diset ke 31mm (31 + 235 = 266)
             self.line(31, 22, 266, 22) 
             self.ln(10)
             
@@ -755,25 +798,22 @@ def generate_history_pdf_report(df_history):
             self.set_y(-15)
             self.set_font('Arial', 'I', 8)
             self.set_text_color(100, 100, 100)
-            self.cell(0, 10, f'Halaman {self.page_no()}', 0, 0, 'C')
+            self.cell(0, 10, t(f'Halaman {self.page_no()}', f'Page {self.page_no()}'), 0, 0, 'C')
 
-    # Format Landscape A4 (297 mm x 210 mm)
     pdf = PDFReport(orientation='L', unit='mm', format='A4')
-    # Set margin 31mm agar tabel yang lebarnya 235mm bisa presisi di tengah
     pdf.set_left_margin(31)
     pdf.set_right_margin(31)
     pdf.add_page()
     
     pdf.set_font("Arial", 'B', 12)
     pdf.set_text_color(30, 41, 59)
-    pdf.cell(0, 10, f"Total Riwayat: {len(df_history)} Produk", 0, 1)
+    pdf.cell(0, 10, t(f"Total Riwayat: {len(df_history)} Produk", f"Total History: {len(df_history)} Products"), 0, 1)
     pdf.ln(5)
     
     col_w = [25, 20, 25, 25, 20, 25, 20, 20, 25, 30]
     total_table_width = sum(col_w)
     
     for idx, row in df_history.iterrows():
-        # Judul per produk
         pdf.set_font("Arial", 'B', 10)
         pdf.set_fill_color(235, 240, 248)
         
@@ -782,23 +822,27 @@ def generate_history_pdf_report(df_history):
         name = name.encode('latin-1', 'replace').decode('latin-1')
         
         skor_val = row.get('Skor Risiko (%)', 0)
-        skor = f"{skor_val}%" if pd.notna(skor_val) and skor_val != "Data belum cukup" else "-"
+        skor_str = t("Data belum cukup", "Insufficient data")
+        skor = f"{skor_val}%" if pd.notna(skor_val) and skor_val != skor_str and skor_val != "Data belum cukup" else "-"
         klas = str(row.get('Klasifikasi', '-'))
+        klas = tr_risk(klas)
         
-        title = f"{idx+1}. {name}   |   Waktu: {waktu}   |   Skor Risiko: {skor} ({klas})"
-        # Mengunci lebar judul sama persis dengan tabel (total_table_width)
+        title_txt = t("Waktu", "Time")
+        title_score = t("Skor Risiko", "Risk Score")
+        title = f"{idx+1}. {name}   |   {title_txt}: {waktu}   |   {title_score}: {skor} ({klas})"
         pdf.cell(total_table_width, 8, title, 1, 1, 'L', fill=True)
         
-        # Header Tabel Gizi
         pdf.set_font("Arial", 'B', 8)
         pdf.set_fill_color(245, 245, 245)
-        headers = ["Takaran(g)", "Energi", "Lemak Tot", "Lemak Jen", "Protein", "Karbohidrat", "Gula", "Garam", "Natrium(mg)", "N.Benzoat(mg)"]
+        if st.session_state.lang == "ID":
+            headers = ["Takaran(g)", "Energi", "Lemak Tot", "Lemak Jen", "Protein", "Karbohidrat", "Gula", "Garam", "Natrium(mg)", "N.Benzoat(mg)"]
+        else:
+            headers = ["Serving(g)", "Energy", "Tot Fat", "Sat Fat", "Protein", "Carbs", "Sugar", "Salt", "Sodium(mg)", "N.Benzoate(mg)"]
         
         for i in range(len(headers)):
             pdf.cell(col_w[i], 6, headers[i], 1, 0, 'C', fill=True)
         pdf.ln()
         
-        # Nilai Tabel Gizi
         pdf.set_font("Arial", '', 8)
         vals = [
             str(row.get('Takaran Saji (g/ml)', '-')),
@@ -816,41 +860,33 @@ def generate_history_pdf_report(df_history):
             pdf.cell(col_w[i], 6, vals[i], 1, 0, 'C')
         pdf.ln()
         
-        # Simpan indentasi (margin kiri) yang baru
         current_l_margin = pdf.l_margin
         
-        # Komposisi
         pdf.ln(2)
         pdf.set_font("Arial", 'B', 8)
-        pdf.cell(25, 5, "Komposisi:", 0, 0, 'L')
+        pdf.cell(25, 5, t("Komposisi:", "Composition:"), 0, 0, 'L')
         
         x_start = pdf.get_x()
         pdf.set_left_margin(x_start)
         pdf.set_font("Arial", '', 8)
         komposisi = str(row.get('Komposisi', '-')).encode('latin-1', 'replace').decode('latin-1')
         komposisi = komposisi.replace('\n', ' ').replace('\r', '')
-        # Mengunci batas pembungkus teks (wrap) sama persis dengan ujung tabel gizi
         pdf.multi_cell(total_table_width - 25, 5, komposisi)
         
-        # Kembalikan indentasi awal
         pdf.set_left_margin(current_l_margin)
         
-        # Rekomendasi
         pdf.ln(1)
         pdf.set_font("Arial", 'B', 8)
-        pdf.cell(25, 5, "Rekomendasi:", 0, 0, 'L')
+        pdf.cell(25, 5, t("Rekomendasi:", "Recommendation:"), 0, 0, 'L')
         
         x_start = pdf.get_x()
         pdf.set_left_margin(x_start)
         pdf.set_font("Arial", '', 8)
         rekomendasi = str(row.get('Rekomendasi', '-')).encode('latin-1', 'replace').decode('latin-1')
         rekomendasi = rekomendasi.replace('\n', ' ').replace('\r', '')
-        # Mengunci batas pembungkus teks (wrap) sama persis dengan ujung tabel gizi
         pdf.multi_cell(total_table_width - 25, 5, rekomendasi)
         
-        # Kembalikan indentasi awal
         pdf.set_left_margin(current_l_margin)
-        
         pdf.ln(8)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmpdf:
@@ -864,23 +900,23 @@ def generate_history_pdf_report(df_history):
 
 def render_analysis_side(analysis_result, current_signature=None):
     if not analysis_result:
-        st.info("Hasil analisis akan muncul di sini setelah tombol analisis diklik.")
+        st.info(t("Hasil analisis akan muncul di sini setelah tombol analisis diklik.", "Analysis results will appear here after the analyze button is clicked."))
         return
 
     stored_signature = analysis_result.get("input_signature")
     if stored_signature is not None and current_signature is not None and stored_signature != current_signature:
-        st.warning("Data input sudah berubah setelah analisis terakhir. Klik tombol analisis lagi untuk memperbarui hasil.")
+        st.warning(t("Data input sudah berubah setelah analisis terakhir. Klik tombol analisis lagi untuk memperbarui hasil.", "Input data has changed since the last analysis. Click the analyze button again to update results."))
 
     if analysis_result.get("status") == "insufficient":
-        st.warning(analysis_result.get("message", "Data belum cukup untuk dianalisis."))
-        st.info(analysis_result.get("integrity_note", "Periksa kembali data input sebelum analisis."))
+        st.warning(analysis_result.get("message", t("Data belum cukup untuk dianalisis.", "Insufficient data for analysis.")))
+        st.info(analysis_result.get("integrity_note", t("Periksa kembali data input sebelum analisis.", "Recheck input data before analysis.")))
         return
 
     risk_score = float(analysis_result.get("risk_score", 0))
     xai_factors = analysis_result.get("xai_factors", {})
 
     render_risk_status(risk_score)
-    st.markdown("#### Radar Kontribusi Nutrisi")
+    st.markdown(t("#### Radar Kontribusi Nutrisi", "#### Nutrition Contribution Radar"))
     render_xai_radar(xai_factors)
 
 
@@ -904,7 +940,6 @@ def render_analysis_bottom(analysis_result, current_threshold):
     render_health_metrics(nutrition_data, takaran_saji, current_threshold, show_header=True)
 
 
-# --- Update: Record ALL inputs into history dataframe ---
 def store_product_analysis_result(product_name, takaran_saji, nutrition_data, komposisi, store_key, input_signature=None):
     analysis_result = build_analysis_result(product_name, takaran_saji, nutrition_data, komposisi)
     analysis_result["input_signature"] = input_signature or make_analysis_signature(product_name, takaran_saji, nutrition_data, komposisi)
@@ -916,7 +951,7 @@ def store_product_analysis_result(product_name, takaran_saji, nutrition_data, ko
         risk_info = analysis_result["risk_info"]
         
         if not product_name:
-            product_name = "Produk Tanpa Nama"
+            product_name = t("Produk Tanpa Nama", "Unnamed Product")
         
         st.session_state.scan_history.append({
             "Waktu Analisis": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -977,25 +1012,25 @@ def input_form(prefix, defaults):
     set_widget_default(benzoat_key, float(defaults.get("natrium_benzoat", 0.0)))
     set_widget_default(komposisi_key, str(defaults.get("komposisi", "")))
 
-    product_name = st.text_input("Nama Produk", key=name_key)
+    product_name = st.text_input(t("Nama Produk", "Product Name"), key=name_key)
 
     c0, c1, c2 = st.columns(3)
-    takaran_saji = c0.number_input("Takaran Saji g atau ml", min_value=1.0, format="%.2f", key=saji_key)
-    energi = c1.number_input("Energi kkal", min_value=0.0, format="%.2f", key=energi_key)
-    lemak_total = c2.number_input("Lemak Total g", min_value=0.0, format="%.2f", key=lemak_key)
+    takaran_saji = c0.number_input(t("Takaran Saji g atau ml", "Serving Size g or ml"), min_value=1.0, format="%.2f", key=saji_key)
+    energi = c1.number_input(t("Energi kkal", "Energy kcal"), min_value=0.0, format="%.2f", key=energi_key)
+    lemak_total = c2.number_input(t("Lemak Total g", "Total Fat g"), min_value=0.0, format="%.2f", key=lemak_key)
 
     c3, c4, c5 = st.columns(3)
-    lemak_jenuh = c3.number_input("Lemak Jenuh g", min_value=0.0, format="%.2f", key=jenuh_key)
-    protein = c4.number_input("Protein g", min_value=0.0, format="%.2f", key=protein_key)
-    karbohidrat = c5.number_input("Karbohidrat g", min_value=0.0, format="%.2f", key=karbo_key)
+    lemak_jenuh = c3.number_input(t("Lemak Jenuh g", "Saturated Fat g"), min_value=0.0, format="%.2f", key=jenuh_key)
+    protein = c4.number_input(t("Protein g", "Protein g"), min_value=0.0, format="%.2f", key=protein_key)
+    karbohidrat = c5.number_input(t("Karbohidrat g", "Carbohydrate g"), min_value=0.0, format="%.2f", key=karbo_key)
 
     c6, c7, c8, c9 = st.columns(4)
-    gula = c6.number_input("Gula g", min_value=0.0, format="%.2f", key=gula_key)
-    garam = c7.number_input("Garam g", min_value=0.0, format="%.2f", key=garam_key)
-    natrium = c8.number_input("Natrium mg", min_value=0.0, format="%.2f", key=natrium_key)
-    natrium_benzoat = c9.number_input("Natrium Benzoat mg", min_value=0.0, format="%.2f", key=benzoat_key)
+    gula = c6.number_input(t("Gula g", "Sugar g"), min_value=0.0, format="%.2f", key=gula_key)
+    garam = c7.number_input(t("Garam g", "Salt g"), min_value=0.0, format="%.2f", key=garam_key)
+    natrium = c8.number_input(t("Natrium mg", "Sodium mg"), min_value=0.0, format="%.2f", key=natrium_key)
+    natrium_benzoat = c9.number_input(t("Natrium Benzoat mg", "Sodium Benzoate mg"), min_value=0.0, format="%.2f", key=benzoat_key)
 
-    komposisi = st.text_area("Komposisi", height=120, key=komposisi_key)
+    komposisi = st.text_area(t("Komposisi", "Composition"), height=120, key=komposisi_key)
 
     nutrition_data = build_nutrition_data(
         energi, lemak_total, lemak_jenuh, protein, karbohidrat, gula, garam, natrium, natrium_benzoat
@@ -1004,98 +1039,106 @@ def input_form(prefix, defaults):
     return product_name, takaran_saji, nutrition_data, komposisi
 
 
-# --- FITUR BARU: HEADER BANNER YANG RAPI ---
 try:
     col_hdr1, col_hdr2, col_hdr3 = st.columns([1, 4, 1])
     with col_hdr2:
         st.image("assets/Header Smart NutriScan AI.png", use_container_width=True)
 except Exception:
     pass
-# ---------------------------------------------
 
 
 with st.sidebar:
+    lang_choice = st.radio("Language / Bahasa", ["ID", "EN"], horizontal=True)
+    st.session_state.lang = lang_choice
+
     try:
         st.image("assets/Logo Smart NutriScan AI.png", width=150)
     except Exception:
         st.markdown("## SMART NutriScan AI")
 
     st.title("SMART NutriScan AI")
-    st.header("Profil Pengguna")
+    st.header(t("Profil Pengguna", "User Profile"))
 
     col_gender, col_age = st.columns(2)
-    user_gender = col_gender.selectbox("Gender", ["Pria", "Wanita"])
-    user_age = col_age.number_input("Usia", min_value=1, max_value=120, value=25)
+    user_gender = col_gender.selectbox(t("Gender", "Gender"), [t("Pria", "Male"), t("Wanita", "Female")])
+    user_age = col_age.number_input(t("Usia", "Age"), min_value=1, max_value=120, value=25)
 
     col_weight, col_height = st.columns(2)
-    user_weight = col_weight.number_input("Berat kg", min_value=10.0, max_value=300.0, value=65.0)
-    user_height = col_height.number_input("Tinggi cm", min_value=50.0, max_value=250.0, value=165.0)
+    user_weight = col_weight.number_input(t("Berat kg", "Weight kg"), min_value=10.0, max_value=300.0, value=65.0)
+    user_height = col_height.number_input(t("Tinggi cm", "Height cm"), min_value=50.0, max_value=250.0, value=165.0)
 
-    user_activity = st.selectbox("Aktivitas", ["Sedentary", "Ringan", "Sedang", "Aktif", "Sangat Aktif"])
-    kondisi_medis = st.selectbox("Kondisi Khusus", ["Tidak Ada", "Penderita Hipertensi", "Risiko Penyakit Ginjal", "Anak anak"])
+    act_list = [t("Sedentary", "Sedentary"), t("Ringan", "Light"), t("Sedang", "Moderate"), t("Aktif", "Active"), t("Sangat Aktif", "Very Active")]
+    user_activity = st.selectbox(t("Aktivitas", "Activity"), act_list)
+    
+    med_list = [t("Tidak Ada", "None"), t("Penderita Hipertensi", "Hypertension"), t("Risiko Penyakit Ginjal", "Kidney Disease Risk"), t("Anak anak", "Children")]
+    kondisi_medis = st.selectbox(t("Kondisi Khusus", "Medical Condition"), med_list)
 
     current_threshold = hitung_tdee_dinamis(user_gender, user_age, user_weight, user_height, user_activity)
-    if kondisi_medis == "Penderita Hipertensi":
+    
+    if kondisi_medis in ["Penderita Hipertensi", "Hypertension"]:
         current_threshold["natrium"] = 1200
-    elif kondisi_medis == "Risiko Penyakit Ginjal":
+    elif kondisi_medis in ["Risiko Penyakit Ginjal", "Kidney Disease Risk"]:
         current_threshold["natrium"] = 1000
         current_threshold["kalori"] *= 0.9
-    elif kondisi_medis == "Anak anak":
+    elif kondisi_medis in ["Anak anak", "Children"]:
         current_threshold["gula"] = 25
         current_threshold["natrium"] = 1500
 
-    with st.expander("Lihat batas harian"):
-        st.write(f"Kalori: {current_threshold['kalori']:.2f} kkal")
-        st.write(f"Gula: {current_threshold['gula']:.2f} g")
-        st.write(f"Lemak jenuh: {current_threshold['lemak_jenuh']:.2f} g")
-        st.write(f"Natrium: {current_threshold['natrium']:.2f} mg")
+    with st.expander(t("Lihat batas harian", "View daily limits")):
+        st.write(f"{t('Kalori', 'Calories')}: {current_threshold['kalori']:.2f} kcal")
+        st.write(f"{t('Gula', 'Sugar')}: {current_threshold['gula']:.2f} g")
+        st.write(f"{t('Lemak jenuh', 'Saturated Fat')}: {current_threshold['lemak_jenuh']:.2f} g")
+        st.write(f"{t('Natrium', 'Sodium')}: {current_threshold['natrium']:.2f} mg")
 
-    app_mode = st.radio(
-        "Pilih Fitur",
-        [
-            "Analisis Produk Tunggal",
-            "Scan from Image",
-            "Analisis Batch Excel",
-            "Perbandingan Produk",  
-            "Simulasi Konsumsi Produk",
-            "Riwayat Analisis",
-            "Edukasi Gizi",
-        ],
-    )
+    feature_options = [
+        t("Analisis Produk Tunggal", "Single Product Analysis"),
+        "Scan from Image",
+        t("Analisis Batch Excel", "Batch Excel Analysis"),
+        t("Perbandingan Produk", "Product Comparison"),
+        t("Simulasi Konsumsi Produk", "Consumption Simulation"),
+        t("Riwayat Analisis", "Analysis History"),
+        t("Edukasi Gizi", "Nutrition Education"),
+    ]
+    app_mode = st.radio(t("Pilih Fitur", "Select Feature"), feature_options)
 
 
 st.title("SMART NutriScan AI")
-st.caption("Analisis produk pangan berbasis OCR, machine learning, aturan gizi terkalibrasi, dan konfirmasi data manual.")
+st.caption(t(
+    "Analisis produk pangan berbasis OCR, machine learning, aturan gizi terkalibrasi, dan konfirmasi data manual.",
+    "Food product analysis based on OCR, machine learning, calibrated nutrition rules, and manual data confirmation."
+))
 
 model_ready = all([feat_model, lgbm_model, w2v_model, scaler])
 if model_ready:
-    st.success("Model utama berhasil dimuat. Skor tetap dijaga oleh aturan gizi agar klasifikasi konsisten.")
+    st.success(t("Model utama berhasil dimuat. Skor tetap dijaga oleh aturan gizi agar klasifikasi konsisten.", "Main model loaded successfully. Score is maintained by nutrition rules to ensure classification consistency."))
 else:
-    st.warning("Sebagian model utama belum terbaca. Aplikasi tetap berjalan dengan analisis gizi terkalibrasi.")
+    st.warning(t("Sebagian model utama belum terbaca. Aplikasi tetap berjalan dengan analisis gizi terkalibrasi.", "Some main models are not readable. App is still running with calibrated nutritional analysis."))
 
 
-if app_mode == "Analisis Produk Tunggal":
-    st.header("Analisis Produk Tunggal")
+if app_mode in ["Analisis Produk Tunggal", "Single Product Analysis"]:
+    st.header(t("Analisis Produk Tunggal", "Single Product Analysis"))
 
     manual_input_col, manual_result_col = st.columns([1.15, 1], gap="large")
 
     with manual_input_col:
-        st.subheader("Input Informasi Produk")
+        st.subheader(t("Input Informasi Produk", "Input Product Information"))
         
         if "preset_selector" not in st.session_state:
             st.session_state.preset_selector = list(EXAMPLE_PRESETS.keys())[0]
 
+        preset_options = list(EXAMPLE_PRESETS.keys())
         st.selectbox(
-            "Pilih contoh uji atau isi manual", 
-            list(EXAMPLE_PRESETS.keys()), 
+            t("Pilih contoh uji atau isi manual", "Select example or fill manually"), 
+            preset_options, 
             key="preset_selector",
+            format_func=lambda x: t(x, EN_PRESET_NAMES.get(x, x)),
             on_change=apply_manual_preset
         )
         
         product_name, takaran_saji, nutrition_data, komposisi = input_form("manual", EXAMPLE_PRESETS["Kosong"])
         manual_signature = make_analysis_signature(product_name, takaran_saji, nutrition_data, komposisi)
 
-        if st.button("Analisis AI dan Gizi", type="primary"):
+        if st.button(t("Analisis AI dan Gizi", "Analyze AI and Nutrition"), type="primary"):
             store_product_analysis_result(
                 product_name,
                 takaran_saji,
@@ -1104,41 +1147,48 @@ if app_mode == "Analisis Produk Tunggal":
                 store_key="manual_analysis_result",
                 input_signature=manual_signature,
             )
-            st.success("Analisis berhasil diperbarui. Hasil ditampilkan di panel kanan.")
+            st.success(t("Analisis berhasil diperbarui. Hasil ditampilkan di panel kanan.", "Analysis successfully updated. Results are displayed on the right panel."))
 
     with manual_result_col:
-        st.markdown("### Profil & Analisis Produk Dasar")
-        st.caption("Ringkasan prediksi risiko dan kontribusi nutrisi utama.")
+        st.markdown(t("### Profil & Analisis Produk Dasar", "### Basic Product Profile & Analysis"))
+        st.caption(t("Ringkasan prediksi risiko dan kontribusi nutrisi utama.", "Summary of predicted risk and main nutritional contributions."))
         render_analysis_side(st.session_state.manual_analysis_result, current_signature=manual_signature)
 
     render_analysis_bottom(st.session_state.manual_analysis_result, current_threshold)
 
 
 elif app_mode == "Scan from Image":
-    st.header("Scan Produk Otomatis")
-    st.info("Ambil foto dekat, lurus, tidak blur, dan pastikan label memenuhi sebagian besar area gambar. Setelah OCR selesai, koreksi data sebelum analisis.")
+    st.header(t("Scan Produk Otomatis", "Automatic Product Scan"))
+    st.info(t(
+        "Ambil foto dekat, lurus, tidak blur, dan pastikan label memenuhi sebagian besar area gambar. Setelah OCR selesai, koreksi data sebelum analisis.",
+        "Take a close, straight, non-blurry photo, and ensure the label covers most of the image area. After OCR completes, correct the data before analysis."
+    ))
 
-    if st.button("Reset Hasil OCR"):
+    if st.button(t("Reset Hasil OCR", "Reset OCR Results")):
         st.session_state.ocr_data = init_parsed_data()
         clear_ocr_analysis_result()
         bump_ocr_form_version()
-        st.success("Hasil OCR dan analisis terakhir sudah dikosongkan.")
+        st.success(t("Hasil OCR dan analisis terakhir sudah dikosongkan.", "Last OCR and analysis results have been cleared."))
 
     col_scan1, col_scan2 = st.columns(2)
 
     with col_scan1:
-        st.subheader("Scan 1: Informasi Nilai Gizi")
-        input_type_1 = st.radio("Metode input nilai gizi", ["Upload File", "Kamera Langsung"], key="input_gizi")
-        img_file_1 = st.file_uploader("Upload foto nilai gizi", type=["jpg", "jpeg", "png"], key="upload_gizi") if input_type_1 == "Upload File" else st.camera_input("Foto nilai gizi", key="camera_gizi")
+        st.subheader(t("Scan 1: Informasi Nilai Gizi", "Scan 1: Nutritional Value Info"))
+        input_type_1 = st.radio(t("Metode input nilai gizi", "Nutrition value input method"), [t("Upload File", "Upload File"), t("Kamera Langsung", "Live Camera")], key="input_gizi")
+        
+        if input_type_1 in ["Upload File"]:
+            img_file_1 = st.file_uploader(t("Upload foto nilai gizi", "Upload nutrition value photo"), type=["jpg", "jpeg", "png"], key="upload_gizi") 
+        else:
+            img_file_1 = st.camera_input(t("Foto nilai gizi", "Nutrition photo"), key="camera_gizi")
 
         if img_file_1 is not None:
             try:
                 image_1_original = Image.open(img_file_1)
                 image_1_display = standardize_image_size(image_1_original, target_ratio=4/3)
-                safe_image(image_1_display, caption="Gambar nilai gizi", width=350)
+                safe_image(image_1_display, caption=t("Gambar nilai gizi", "Nutrition image"), width=350)
 
-                if st.button("Proses OCR Nilai Gizi", key="btn_ocr_gizi"):
-                    with st.spinner("Mempersiapkan OCR dan membaca nilai gizi secara bertahap..."):
+                if st.button(t("Proses OCR Nilai Gizi", "Process Nutrition OCR"), key="btn_ocr_gizi"):
+                    with st.spinner(t("Mempersiapkan OCR dan membaca nilai gizi secara bertahap...", "Preparing OCR and reading nutritional values...")):
                         reader, reader_error = get_ocr_reader_safely()
                         if reader_error:
                             scan_result_1, ocr_error_1 = None, reader_error
@@ -1146,8 +1196,8 @@ elif app_mode == "Scan from Image":
                             scan_result_1, ocr_error_1 = run_ocr_safely(reader, image_1_original, mode="nutrition")
 
                     if ocr_error_1:
-                        st.error("OCR nilai gizi gagal diproses. Aplikasi tidak dihentikan. Silakan input manual atau coba foto yang lebih jelas.")
-                        with st.expander("Detail error OCR nilai gizi"):
+                        st.error(t("OCR nilai gizi gagal diproses. Aplikasi tidak dihentikan. Silakan input manual atau coba foto yang lebih jelas.", "Nutrition OCR failed. App is not stopped. Please input manually or try a clearer photo."))
+                        with st.expander(t("Detail error OCR nilai gizi", "Nutrition OCR error details")):
                             st.code(ocr_error_1)
                     else:
                         parsed_gizi = scan_result_1["parsed"]
@@ -1161,26 +1211,30 @@ elif app_mode == "Scan from Image":
                             clear_ocr_analysis_result()
                             bump_ocr_form_version()
 
-                        st.success("Nilai gizi berhasil diproses. Angka satuan g yang terbaca sebagai 9 sudah dikoreksi sebelum masuk form. Periksa lagi sebelum analisis.")
-                        render_ocr_result_debug(scan_result_1, "nilai gizi")
+                        st.success(t("Nilai gizi berhasil diproses. Angka satuan g yang terbaca sebagai 9 sudah dikoreksi sebelum masuk form. Periksa lagi sebelum analisis.", "Nutritional values successfully processed. Check again before analysis."))
+                        render_ocr_result_debug(scan_result_1, t("nilai gizi", "nutrition values"))
             except Exception as exc:
-                st.error("Gambar nilai gizi tidak bisa dibaca. Coba upload ulang dalam format JPG atau PNG.")
-                with st.expander("Detail error gambar nilai gizi"):
+                st.error(t("Gambar nilai gizi tidak bisa dibaca. Coba upload ulang dalam format JPG atau PNG.", "Nutrition image cannot be read. Try re-uploading in JPG or PNG format."))
+                with st.expander(t("Detail error gambar nilai gizi", "Nutrition image error details")):
                     st.code(str(exc))
 
     with col_scan2:
-        st.subheader("Scan 2: Komposisi Produk")
-        input_type_2 = st.radio("Metode input komposisi", ["Upload File", "Kamera Langsung"], key="input_komposisi")
-        img_file_2 = st.file_uploader("Upload foto komposisi", type=["jpg", "jpeg", "png"], key="upload_komposisi") if input_type_2 == "Upload File" else st.camera_input("Foto komposisi", key="camera_komposisi")
+        st.subheader(t("Scan 2: Komposisi Produk", "Scan 2: Product Composition"))
+        input_type_2 = st.radio(t("Metode input komposisi", "Composition input method"), [t("Upload File", "Upload File"), t("Kamera Langsung", "Live Camera")], key="input_komposisi")
+        
+        if input_type_2 in ["Upload File"]:
+            img_file_2 = st.file_uploader(t("Upload foto komposisi", "Upload composition photo"), type=["jpg", "jpeg", "png"], key="upload_komposisi") 
+        else:
+            img_file_2 = st.camera_input(t("Foto komposisi", "Composition photo"), key="camera_komposisi")
 
         if img_file_2 is not None:
             try:
                 image_2_original = Image.open(img_file_2)
                 image_2_display = standardize_image_size(image_2_original, target_ratio=4/3)
-                safe_image(image_2_display, caption="Gambar komposisi", width=350)
+                safe_image(image_2_display, caption=t("Gambar komposisi", "Composition image"), width=350)
 
-                if st.button("Proses OCR Komposisi", key="btn_ocr_komposisi"):
-                    with st.spinner("Mempersiapkan OCR dan membaca komposisi secara bertahap..."):
+                if st.button(t("Proses OCR Komposisi", "Process Composition OCR"), key="btn_ocr_komposisi"):
+                    with st.spinner(t("Mempersiapkan OCR dan membaca komposisi secara bertahap...", "Preparing OCR and reading composition...")):
                         reader, reader_error = get_ocr_reader_safely()
                         if reader_error:
                             scan_result_2, ocr_error_2 = None, reader_error
@@ -1188,8 +1242,8 @@ elif app_mode == "Scan from Image":
                             scan_result_2, ocr_error_2 = run_ocr_safely(reader, image_2_original, mode="composition")
 
                     if ocr_error_2:
-                        st.error("OCR komposisi gagal diproses. Aplikasi tidak dihentikan. Silakan input manual atau coba foto yang lebih jelas.")
-                        with st.expander("Detail error OCR komposisi"):
+                        st.error(t("OCR komposisi gagal diproses. Aplikasi tidak dihentikan. Silakan input manual atau coba foto yang lebih jelas.", "Composition OCR failed. App is not stopped. Please input manually or try a clearer photo."))
+                        with st.expander(t("Detail error OCR komposisi", "Composition OCR error details")):
                             st.code(ocr_error_2)
                     else:
                         parsed_komposisi = scan_result_2["parsed"].get("komposisi", "Tidak terdeteksi.")
@@ -1198,25 +1252,25 @@ elif app_mode == "Scan from Image":
                             clear_ocr_analysis_result()
                             bump_ocr_form_version()
 
-                        st.success("Komposisi berhasil diproses dari satu variasi OCR terbaik agar tidak berulang. Periksa lagi sebelum analisis.")
-                        render_ocr_result_debug(scan_result_2, "komposisi")
+                        st.success(t("Komposisi berhasil diproses dari satu variasi OCR terbaik agar tidak berulang. Periksa lagi sebelum analisis.", "Composition successfully processed from the best OCR variant. Check again before analysis."))
+                        render_ocr_result_debug(scan_result_2, t("komposisi", "composition"))
             except Exception as exc:
-                st.error("Gambar komposisi tidak bisa dibaca. Coba upload ulang dalam format JPG atau PNG.")
-                with st.expander("Detail error gambar komposisi"):
+                st.error(t("Gambar komposisi tidak bisa dibaca. Coba upload ulang dalam format JPG atau PNG.", "Composition image cannot be read. Try re-uploading in JPG or PNG format."))
+                with st.expander(t("Detail error gambar komposisi", "Composition image error details")):
                     st.code(str(exc))
 
     st.markdown("---")
     input_col, result_col = st.columns([1.15, 1], gap="large")
 
     with input_col:
-        st.subheader("Konfirmasi Data Input (Hasil OCR)")
-        st.warning("Jangan langsung percaya OCR mentah. Koreksi angka dan komposisi sebelum menjalankan rekomendasi.")
+        st.subheader(t("Konfirmasi Data Input (Hasil OCR)", "Confirm Input Data (OCR Results)"))
+        st.warning(t("Jangan langsung percaya OCR mentah. Koreksi angka dan komposisi sebelum menjalankan rekomendasi.", "Do not blindly trust raw OCR. Correct numbers and composition before running recommendations."))
 
         ocr_prefix = f"ocr_{st.session_state.ocr_form_version}"
         product_name, takaran_saji, nutrition_data, komposisi = input_form(ocr_prefix, st.session_state.ocr_data)
         ocr_signature = make_analysis_signature(product_name, takaran_saji, nutrition_data, komposisi)
 
-        if st.button("Analisis dari Data Hasil OCR", type="primary"):
+        if st.button(t("Analisis dari Data Hasil OCR", "Analyze from OCR Data"), type="primary"):
             store_product_analysis_result(
                 product_name,
                 takaran_saji,
@@ -1225,29 +1279,32 @@ elif app_mode == "Scan from Image":
                 store_key="ocr_analysis_result",
                 input_signature=ocr_signature,
             )
-            st.success("Analisis berhasil diperbarui. Hasil ditampilkan di panel kanan.")
+            st.success(t("Analisis berhasil diperbarui. Hasil ditampilkan di panel kanan.", "Analysis successfully updated. Results are displayed on the right panel."))
 
     with result_col:
-        st.markdown("### Profil & Analisis Produk Dasar")
-        st.caption("Ringkasan prediksi risiko dan kontribusi nutrisi utama.")
+        st.markdown(t("### Profil & Analisis Produk Dasar", "### Basic Product Profile & Analysis"))
+        st.caption(t("Ringkasan prediksi risiko dan kontribusi nutrisi utama.", "Summary of predicted risk and main nutritional contributions."))
         render_analysis_side(st.session_state.ocr_analysis_result, current_signature=ocr_signature)
         
     render_analysis_bottom(st.session_state.ocr_analysis_result, current_threshold)
 
 
-elif app_mode == "Analisis Batch Excel":
-    st.header("Analisis Batch Excel")
-    st.write("Upload file Excel dengan kolom Nama Produk, Energi, Lemak, Lemak Jenuh, Karbohidrat, Gula, Protein, Garam, Natrium, Natrium Benzoat, dan Komposisi jika tersedia.")
+elif app_mode in ["Analisis Batch Excel", "Batch Excel Analysis"]:
+    st.header(t("Analisis Batch Excel", "Batch Excel Analysis"))
+    st.write(t(
+        "Upload file Excel dengan kolom Nama Produk, Energi, Lemak, Lemak Jenuh, Karbohidrat, Gula, Protein, Garam, Natrium, Natrium Benzoat, dan Komposisi jika tersedia.",
+        "Upload an Excel file with columns Product Name, Energy, Fat, Saturated Fat, Carbohydrate, Sugar, Protein, Salt, Sodium, Sodium Benzoate, and Composition if available."
+    ))
 
-    uploaded_file = st.file_uploader("Upload Excel", type=["xlsx"])
+    uploaded_file = st.file_uploader(t("Upload Excel", "Upload Excel"), type=["xlsx"])
     
     if uploaded_file is not None:
         df = pd.read_excel(uploaded_file)
         
         numeric_cols_to_fix = [
-            "Energi", "Lemak", "Lemak Total", "Lemak Jenuh", 
-            "Karbohidrat", "Gula", "Protein", "Garam", 
-            "Natrium", "Natrium Benzoat", "Takaran Saji", "Takaran"
+            "Energi", "Energy", "Lemak", "Fat", "Lemak Total", "Total Fat", "Lemak Jenuh", "Saturated Fat", 
+            "Karbohidrat", "Carbohydrate", "Gula", "Sugar", "Protein", "Garam", "Salt", 
+            "Natrium", "Sodium", "Natrium Benzoat", "Sodium Benzoate", "Takaran Saji", "Serving Size", "Takaran"
         ]
         
         def fix_excel_date_bug(val):
@@ -1281,7 +1338,7 @@ elif app_mode == "Analisis Batch Excel":
         
         st.dataframe(df, use_container_width=True)
         
-        if st.button("Mulai Analisis Batch", type="primary"):
+        if st.button(t("Mulai Analisis Batch", "Start Batch Analysis"), type="primary"):
             df_clean = preprocess_batch_excel_data(df)
             results = []
             total_rows = len(df_clean)
@@ -1291,27 +1348,27 @@ elif app_mode == "Analisis Batch Excel":
             counter = 0
             for idx, row in df_clean.iterrows():
                 nutrition_data = {
-                    "energi": row.get("Energi", 0),
-                    "lemak_total": row.get("Lemak", row.get("Lemak Total", 0)),
-                    "lemak_jenuh": row.get("Lemak Jenuh", 0),
+                    "energi": row.get("Energi", row.get("Energy", 0)),
+                    "lemak_total": row.get("Lemak", row.get("Lemak Total", row.get("Fat", row.get("Total Fat", 0)))),
+                    "lemak_jenuh": row.get("Lemak Jenuh", row.get("Saturated Fat", 0)),
                     "protein": row.get("Protein", 0),
-                    "karbohidrat": row.get("Karbohidrat", 0),
-                    "gula": row.get("Gula", 0),
-                    "garam": row.get("Garam", 0),
-                    "natrium": row.get("Natrium", 0),
-                    "natrium_benzoat": row.get("Natrium Benzoat", 0),
+                    "karbohidrat": row.get("Karbohidrat", row.get("Carbohydrate", 0)),
+                    "gula": row.get("Gula", row.get("Sugar", 0)),
+                    "garam": row.get("Garam", row.get("Salt", 0)),
+                    "natrium": row.get("Natrium", row.get("Sodium", 0)),
+                    "natrium_benzoat": row.get("Natrium Benzoat", row.get("Sodium Benzoate", 0)),
                 }
-                komposisi = row.get("Komposisi", "")
+                komposisi = row.get("Komposisi", row.get("Composition", ""))
                 
-                takaran_saji = float(row.get("Takaran Saji", row.get("Takaran", 100.0)))
-                product_name = str(row.get("Nama Produk", row.get("Produk", row.get("Kemasan", f"Produk {idx+1}"))))
+                takaran_saji = float(row.get("Takaran Saji", row.get("Takaran", row.get("Serving Size", 100.0))))
+                product_name = str(row.get("Nama Produk", row.get("Produk", row.get("Product Name", f"Product {idx+1}"))))
 
                 if not has_sufficient_input(nutrition_data):
                     results.append({
                         "Nama Produk": product_name,
-                        "Skor Risiko": "Data belum cukup",
-                        "Klasifikasi": "Belum dianalisis",
-                        "Rekomendasi": "Isi nilai gizi yang valid sebelum analisis.",
+                        "Skor Risiko": t("Data belum cukup", "Insufficient data"),
+                        "Klasifikasi": t("Belum dianalisis", "Not analyzed"),
+                        "Rekomendasi": t("Isi nilai gizi yang valid sebelum analisis.", "Fill in valid nutrition values before analysis."),
                         "nutrition_data": nutrition_data,
                         "takaran_saji": takaran_saji
                     })
@@ -1341,21 +1398,34 @@ elif app_mode == "Analisis Batch Excel":
             st.session_state.batch_total_rows = total_rows
             
         if st.session_state.batch_result_df is not None:
-            st.success(f"Analisis batch selesai untuk {st.session_state.batch_total_rows} produk!")
+            st.success(t(f"Analisis batch selesai untuk {st.session_state.batch_total_rows} produk!", f"Batch analysis completed for {st.session_state.batch_total_rows} products!"))
             
-            st.header("Hasil Analisis Batch")
+            st.header(t("Hasil Analisis Batch", "Batch Analysis Results"))
 
-            st.markdown("### 🤖 Ringkasan Insight Otomatis")
+            st.markdown(t("### 🤖 Ringkasan Insight Otomatis", "### 🤖 Automated Insight Summary"))
             insight_text = generate_batch_insights(st.session_state.batch_result_df)
             st.info(insight_text)
             st.markdown("---")
             
             display_cols = ["Nama Produk", "Skor Risiko", "Klasifikasi", "Rekomendasi"]
-            st.dataframe(st.session_state.batch_result_df[display_cols], use_container_width=True)
+            
+            # Translate DataFrame display conditionally
+            df_disp = st.session_state.batch_result_df[display_cols].copy()
+            if st.session_state.lang == "EN":
+                df_disp.rename(columns={
+                    "Nama Produk": "Product Name",
+                    "Skor Risiko": "Risk Score",
+                    "Klasifikasi": "Classification",
+                    "Rekomendasi": "Recommendation"
+                }, inplace=True)
+                df_disp["Classification"] = df_disp["Classification"].apply(tr_risk)
+                st.dataframe(df_disp, use_container_width=True)
+            else:
+                st.dataframe(df_disp, use_container_width=True)
             
             try:
                 st.markdown("---")
-                st.markdown("### 2. Grafik Distribusi Risiko")
+                st.markdown(t("### 2. Grafik Distribusi Risiko", "### 2. Risk Distribution Chart"))
 
                 df_results = st.session_state.batch_result_df.copy()
                 
@@ -1368,14 +1438,17 @@ elif app_mode == "Analisis Batch Excel":
                     classification_colors = {"Aman": "#2ECC71", "Sedang": "#F39C12", "Tinggi": "#E74C3C"}
 
                     # === PIE CHART ===
-                    st.markdown("#### Proporsi Klasifikasi Produk")
+                    st.markdown(t("#### Proporsi Klasifikasi Produk", "#### Product Classification Proportion"))
                     
                     pie_data = valid_df["Klasifikasi"].value_counts().reset_index()
                     pie_data.columns = ["Klasifikasi", "Jumlah"]
                     pie_colors = [classification_colors.get(c, "#95A5A6") for c in pie_data["Klasifikasi"]]
                     
+                    # Translate labels for UI
+                    pie_labels = [tr_risk(c) for c in pie_data["Klasifikasi"]]
+
                     fig_pie = go.Figure(data=[go.Pie(
-                        labels=pie_data["Klasifikasi"], 
+                        labels=pie_labels, 
                         values=pie_data["Jumlah"], 
                         hole=0.4,
                         marker=dict(colors=pie_colors),
@@ -1395,7 +1468,7 @@ elif app_mode == "Analisis Batch Excel":
                     st.markdown("<hr style='border:1px dashed #E2E8F0; margin: 30px 0;'>", unsafe_allow_html=True)
 
                     # === BAR CHART HTML ===
-                    st.markdown("#### Peringkat Skor Risiko Produk")
+                    st.markdown(t("#### Peringkat Skor Risiko Produk", "#### Product Risk Score Ranking"))
                     
                     bar_data = valid_df.sort_values(by="Skor Risiko Numerik", ascending=False)
                     
@@ -1416,17 +1489,19 @@ elif app_mode == "Analisis Batch Excel":
                     st.markdown(html_bars, unsafe_allow_html=True)
                     
                 else:
-                    st.info("Tidak ada data valid yang bisa divisualisasikan dalam grafik.")
+                    st.info(t("Tidak ada data valid yang bisa divisualisasikan dalam grafik.", "No valid data to visualize in the chart."))
                     
                 st.markdown("---")
-                st.markdown("### 🎯 Detail Pemenuhan Angka Kecukupan Gizi Harian per Produk")
+                st.markdown(t("### 🎯 Detail Pemenuhan Angka Kecukupan Gizi Harian per Produk", "### 🎯 Detailed Daily Nutrition Adequacy per Product"))
                 
                 for idx, row in valid_df.iterrows():
-                    prod_name = row.get("Nama Produk", "Produk")
-                    klasifikasi = row.get("Klasifikasi", "-")
+                    prod_name = row.get("Nama Produk", t("Produk", "Product"))
+                    klasifikasi = tr_risk(row.get("Klasifikasi", "-"))
                     skor_num = row.get("Skor Risiko Numerik", 0)
                     
-                    with st.expander(f"📦 {prod_name} — Klasifikasi: {klasifikasi} (Skor: {skor_num:.1f}%)"):
+                    txt_klas = t("Klasifikasi", "Classification")
+                    txt_skor = t("Skor", "Score")
+                    with st.expander(f"📦 {prod_name} — {txt_klas}: {klasifikasi} ({txt_skor}: {skor_num:.1f}%)"):
                         if 'nutrition_data' in row and isinstance(row['nutrition_data'], dict):
                             nut_data = row['nutrition_data']
                         else:
@@ -1436,21 +1511,30 @@ elif app_mode == "Analisis Batch Excel":
                         render_health_metrics(nut_data, t_saji, current_threshold, show_header=False)
                 
             except Exception as e:
-                st.error(f"Terjadi masalah saat merender visualisasi batch: {e}")
+                st.error(t(f"Terjadi masalah saat merender visualisasi batch: {e}", f"Problem occurred when rendering batch visualization: {e}"))
 
             st.markdown("---")
-            st.markdown("### 📥 Export Hasil Analisis")
+            st.markdown(t("### 📥 Export Hasil Analisis", "### 📥 Export Analysis Results"))
 
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                df_to_excel = st.session_state.batch_result_df[display_cols]
-                df_to_excel.to_excel(writer, index=False, sheet_name="Hasil Analisis")
+                # To excel formatting
+                df_to_excel = st.session_state.batch_result_df[display_cols].copy()
+                if st.session_state.lang == "EN":
+                    df_to_excel.rename(columns={
+                        "Nama Produk": "Product Name",
+                        "Skor Risiko": "Risk Score",
+                        "Klasifikasi": "Classification",
+                        "Rekomendasi": "Recommendation"
+                    }, inplace=True)
+                    df_to_excel["Classification"] = df_to_excel["Classification"].apply(tr_risk)
+                df_to_excel.to_excel(writer, index=False, sheet_name=t("Hasil Analisis", "Analysis Result"))
 
             col_dl1, col_dl2 = st.columns(2)
             
             with col_dl1:
                 st.download_button(
-                    label="📊 Download Hasil Excel", 
+                    label=t("📊 Download Hasil Excel", "📊 Download Excel Results"), 
                     data=output.getvalue(), 
                     file_name="hasil_analisis_nutriscan.xlsx",
                     use_container_width=True
@@ -1464,25 +1548,28 @@ elif app_mode == "Analisis Batch Excel":
                     pdf_ready = False
                     
                 if pdf_ready:
-                    with st.spinner("Menyiapkan dokumen PDF Profesional..."):
+                    with st.spinner(t("Menyiapkan dokumen PDF Profesional...", "Preparing Professional PDF Document...")):
                         pdf_data = generate_pdf_report(df_results, insight_text, fig_pie)
                         st.download_button(
-                            label="📑 Download PDF Report", 
+                            label=t("📑 Download PDF Report", "📑 Download PDF Report"), 
                             data=pdf_data, 
                             file_name="Laporan_Analisis_NutriScan.pdf", 
                             mime="application/pdf",
                             use_container_width=True
                         )
                 else:
-                    st.warning("⚠️ Modul 'fpdf' belum terinstall. Jalankan `pip install fpdf kaleido` di terminal agar tombol Export PDF muncul.")
+                    st.warning(t("⚠️ Modul 'fpdf' belum terinstall. Jalankan `pip install fpdf kaleido` di terminal agar tombol Export PDF muncul.", "⚠️ Module 'fpdf' not installed. Run `pip install fpdf kaleido` to show Export PDF button."))
             
     else:
         st.session_state.batch_result_df = None
 
 
-elif app_mode == "Perbandingan Produk":
-    st.header("Perbandingan Produk (Food Comparison Mode)")
-    st.info("Bandingkan metrik AI (Skor Risiko) dan metrik BI (Kepadatan Energi) dari dua produk sekaligus. Anda dapat menggunakan preset atau OCR untuk memindai label masing-masing produk.")
+elif app_mode in ["Perbandingan Produk", "Product Comparison"]:
+    st.header(t("Perbandingan Produk (Food Comparison Mode)", "Product Comparison (Food Comparison Mode)"))
+    st.info(t(
+        "Bandingkan metrik AI (Skor Risiko) dan metrik BI (Kepadatan Energi) dari dua produk sekaligus. Anda dapat menggunakan preset atau OCR untuk memindai label masing-masing produk.",
+        "Compare AI metrics (Risk Score) and BI metrics (Energy Density) of two products simultaneously. Use presets or OCR to scan labels of each product."
+    ))
 
     if "comp_a_data" not in st.session_state:
         st.session_state.comp_a_data = init_parsed_data()
@@ -1503,23 +1590,25 @@ elif app_mode == "Perbandingan Produk":
 
     colA, colB = st.columns(2, gap="large")
 
+    method_options = [t("Pilih Contoh Produk", "Choose Example"), t("Scan Label (OCR)", "Scan Label (OCR)"), t("Input Manual", "Manual Input")]
+
     with colA:
-        st.markdown("### 📦 Produk A")
-        method_a = st.radio("Metode Input Produk A:", ["Pilih Contoh Produk", "Scan Label (OCR)", "Input Manual"], horizontal=True, key="method_a")
+        st.markdown(t("### 📦 Produk A", "### 📦 Product A"))
+        method_a = st.radio(t("Metode Input Produk A:", "Product A Input Method:"), method_options, horizontal=True, key="method_a")
         
-        if method_a == "Pilih Contoh Produk":
-            st.selectbox("Contoh Uji Produk A", list(EXAMPLE_PRESETS.keys()), key="preset_comp_a", on_change=apply_comp_preset_a)
-        elif method_a == "Scan Label (OCR)":
+        if method_a in ["Pilih Contoh Produk", "Choose Example"]:
+            st.selectbox(t("Contoh Uji Produk A", "Example Test Product A"), list(EXAMPLE_PRESETS.keys()), key="preset_comp_a", format_func=lambda x: t(x, EN_PRESET_NAMES.get(x, x)), on_change=apply_comp_preset_a)
+        elif method_a in ["Scan Label (OCR)", "Scan Label (OCR)"]:
             col_scan_gizi_a, col_scan_komp_a = st.columns(2)
             with col_scan_gizi_a:
-                st.markdown("**1. Scan Nilai Gizi**")
-                type_a_gizi = st.radio("S. Gizi A", ["Upload", "Kamera"], key="type_a_gizi", horizontal=True, label_visibility="collapsed")
-                file_a_gizi = st.file_uploader("Foto Gizi A", type=["jpg", "jpeg", "png"], key="file_a_gizi") if type_a_gizi == "Upload" else st.camera_input("Kamera Gizi A", key="cam_a_gizi")
+                st.markdown(t("**1. Scan Nilai Gizi**", "**1. Scan Nutrition**"))
+                type_a_gizi = st.radio("S. Gizi A", [t("Upload", "Upload"), t("Kamera", "Camera")], key="type_a_gizi", horizontal=True, label_visibility="collapsed")
+                file_a_gizi = st.file_uploader(t("Foto Gizi A", "Nutrition Photo A"), type=["jpg", "jpeg", "png"], key="file_a_gizi") if type_a_gizi in ["Upload"] else st.camera_input(t("Kamera Gizi A", "Nutrition Camera A"), key="cam_a_gizi")
                 if file_a_gizi:
                     img_a_gizi = Image.open(file_a_gizi)
-                    safe_image(standardize_image_size(img_a_gizi), caption="Gizi A", width=250)
+                    safe_image(standardize_image_size(img_a_gizi), caption=t("Gizi A", "Nutrition A"), width=250)
                     if st.button("🔍 OCR Gizi A", key="btn_ocr_a_gizi"):
-                        with st.spinner("Membaca..."):
+                        with st.spinner(t("Membaca...", "Reading...")):
                             reader, err = get_ocr_reader_safely()
                             if err: st.error(err)
                             else:
@@ -1530,17 +1619,17 @@ elif app_mode == "Perbandingan Produk":
                                         if v not in [0, 0.0, "Tidak terdeteksi.", "", "Produk Tanpa Nama"]:
                                             st.session_state.comp_a_data[k] = v
                                     st.session_state.comp_a_ver += 1
-                                    st.success("Tersimpan!")
+                                    st.success(t("Tersimpan!", "Saved!"))
 
             with col_scan_komp_a:
-                st.markdown("**2. Scan Komposisi**")
-                type_a_komp = st.radio("S. Komp A", ["Upload", "Kamera"], key="type_a_komp", horizontal=True, label_visibility="collapsed")
-                file_a_komp = st.file_uploader("Foto Komp A", type=["jpg", "jpeg", "png"], key="file_a_komp") if type_a_komp == "Upload" else st.camera_input("Kamera Komp A", key="cam_a_komp")
+                st.markdown(t("**2. Scan Komposisi**", "**2. Scan Composition**"))
+                type_a_komp = st.radio("S. Komp A", [t("Upload", "Upload"), t("Kamera", "Camera")], key="type_a_komp", horizontal=True, label_visibility="collapsed")
+                file_a_komp = st.file_uploader(t("Foto Komp A", "Composition Photo A"), type=["jpg", "jpeg", "png"], key="file_a_komp") if type_a_komp in ["Upload"] else st.camera_input(t("Kamera Komp A", "Composition Camera A"), key="cam_a_komp")
                 if file_a_komp:
                     img_a_komp = Image.open(file_a_komp)
-                    safe_image(standardize_image_size(img_a_komp), caption="Komp A", width=250)
+                    safe_image(standardize_image_size(img_a_komp), caption=t("Komp A", "Comp A"), width=250)
                     if st.button("🔍 OCR Komposisi A", key="btn_ocr_a_komp"):
-                        with st.spinner("Membaca..."):
+                        with st.spinner(t("Membaca...", "Reading...")):
                             reader, err = get_ocr_reader_safely()
                             if err: st.error(err)
                             else:
@@ -1551,28 +1640,28 @@ elif app_mode == "Perbandingan Produk":
                                     if val and val != "Tidak terdeteksi.":
                                         st.session_state.comp_a_data["komposisi"] = val
                                     st.session_state.comp_a_ver += 1
-                                    st.success("Tersimpan!")
+                                    st.success(t("Tersimpan!", "Saved!"))
 
-        st.markdown("#### Form Data Produk A")
+        st.markdown(t("#### Form Data Produk A", "#### Product A Data Form"))
         prod_name_a, saji_a, nut_a, kompo_a = input_form(f"comp_a_{st.session_state.comp_a_ver}", st.session_state.comp_a_data)
 
     with colB:
-        st.markdown("### 📦 Produk B")
-        method_b = st.radio("Metode Input Produk B:", ["Pilih Contoh Produk", "Scan Label (OCR)", "Input Manual"], horizontal=True, key="method_b")
+        st.markdown(t("### 📦 Produk B", "### 📦 Product B"))
+        method_b = st.radio(t("Metode Input Produk B:", "Product B Input Method:"), method_options, horizontal=True, key="method_b")
         
-        if method_b == "Pilih Contoh Produk":
-            st.selectbox("Contoh Uji Produk B", list(EXAMPLE_PRESETS.keys()), key="preset_comp_b", on_change=apply_comp_preset_b)
-        elif method_b == "Scan Label (OCR)":
+        if method_b in ["Pilih Contoh Produk", "Choose Example"]:
+            st.selectbox(t("Contoh Uji Produk B", "Example Test Product B"), list(EXAMPLE_PRESETS.keys()), key="preset_comp_b", format_func=lambda x: t(x, EN_PRESET_NAMES.get(x, x)), on_change=apply_comp_preset_b)
+        elif method_b in ["Scan Label (OCR)", "Scan Label (OCR)"]:
             col_scan_gizi_b, col_scan_komp_b = st.columns(2)
             with col_scan_gizi_b:
-                st.markdown("**1. Scan Nilai Gizi**")
-                type_b_gizi = st.radio("S. Gizi B", ["Upload", "Kamera"], key="type_b_gizi", horizontal=True, label_visibility="collapsed")
-                file_b_gizi = st.file_uploader("Foto Gizi B", type=["jpg", "jpeg", "png"], key="file_b_gizi") if type_b_gizi == "Upload" else st.camera_input("Kamera Gizi B", key="cam_b_gizi")
+                st.markdown(t("**1. Scan Nilai Gizi**", "**1. Scan Nutrition**"))
+                type_b_gizi = st.radio("S. Gizi B", [t("Upload", "Upload"), t("Kamera", "Camera")], key="type_b_gizi", horizontal=True, label_visibility="collapsed")
+                file_b_gizi = st.file_uploader(t("Foto Gizi B", "Nutrition Photo B"), type=["jpg", "jpeg", "png"], key="file_b_gizi") if type_b_gizi in ["Upload"] else st.camera_input(t("Kamera Gizi B", "Nutrition Camera B"), key="cam_b_gizi")
                 if file_b_gizi:
                     img_b_gizi = Image.open(file_b_gizi)
-                    safe_image(standardize_image_size(img_b_gizi), caption="Gizi B", width=250)
+                    safe_image(standardize_image_size(img_b_gizi), caption=t("Gizi B", "Nutrition B"), width=250)
                     if st.button("🔍 OCR Gizi B", key="btn_ocr_b_gizi"):
-                        with st.spinner("Membaca..."):
+                        with st.spinner(t("Membaca...", "Reading...")):
                             reader, err = get_ocr_reader_safely()
                             if err: st.error(err)
                             else:
@@ -1583,17 +1672,17 @@ elif app_mode == "Perbandingan Produk":
                                         if v not in [0, 0.0, "Tidak terdeteksi.", "", "Produk Tanpa Nama"]:
                                             st.session_state.comp_b_data[k] = v
                                     st.session_state.comp_b_ver += 1
-                                    st.success("Tersimpan!")
+                                    st.success(t("Tersimpan!", "Saved!"))
 
             with col_scan_komp_b:
-                st.markdown("**2. Scan Komposisi**")
-                type_b_komp = st.radio("S. Komp B", ["Upload", "Kamera"], key="type_b_komp", horizontal=True, label_visibility="collapsed")
-                file_b_komp = st.file_uploader("Foto Komp B", type=["jpg", "jpeg", "png"], key="file_b_komp") if type_b_komp == "Upload" else st.camera_input("Kamera Komp B", key="cam_b_komp")
+                st.markdown(t("**2. Scan Komposisi**", "**2. Scan Composition**"))
+                type_b_komp = st.radio("S. Komp B", [t("Upload", "Upload"), t("Kamera", "Camera")], key="type_b_komp", horizontal=True, label_visibility="collapsed")
+                file_b_komp = st.file_uploader(t("Foto Komp B", "Composition Photo B"), type=["jpg", "jpeg", "png"], key="file_b_komp") if type_b_komp in ["Upload"] else st.camera_input(t("Kamera Komp B", "Composition Camera B"), key="cam_b_komp")
                 if file_b_komp:
                     img_b_komp = Image.open(file_b_komp)
-                    safe_image(standardize_image_size(img_b_komp), caption="Komp B", width=250)
+                    safe_image(standardize_image_size(img_b_komp), caption=t("Komp B", "Comp B"), width=250)
                     if st.button("🔍 OCR Komposisi B", key="btn_ocr_b_komp"):
-                        with st.spinner("Membaca..."):
+                        with st.spinner(t("Membaca...", "Reading...")):
                             reader, err = get_ocr_reader_safely()
                             if err: st.error(err)
                             else:
@@ -1604,49 +1693,52 @@ elif app_mode == "Perbandingan Produk":
                                     if val and val != "Tidak terdeteksi.":
                                         st.session_state.comp_b_data["komposisi"] = val
                                     st.session_state.comp_b_ver += 1
-                                    st.success("Tersimpan!")
+                                    st.success(t("Tersimpan!", "Saved!"))
 
-        st.markdown("#### Form Data Produk B")
+        st.markdown(t("#### Form Data Produk B", "#### Product B Data Form"))
         prod_name_b, saji_b, nut_b, kompo_b = input_form(f"comp_b_{st.session_state.comp_b_ver}", st.session_state.comp_b_data)
 
     st.markdown("---")
     
-    if st.button("⚖️ Bandingkan Kedua Produk", type="primary", use_container_width=True):
+    if st.button(t("⚖️ Bandingkan Kedua Produk", "⚖️ Compare Both Products"), type="primary", use_container_width=True):
         res_a = build_analysis_result(prod_name_a, saji_a, nut_a, kompo_a)
         res_b = build_analysis_result(prod_name_b, saji_b, nut_b, kompo_b)
 
         if res_a.get("status") == "ok" and res_b.get("status") == "ok":
-            st.markdown("### 🏆 Kesimpulan Perbandingan AI")
+            st.markdown(t("### 🏆 Kesimpulan Perbandingan AI", "### 🏆 AI Comparison Conclusion"))
             score_a = res_a["risk_score"]
             score_b = res_b["risk_score"]
             diff = abs(score_a - score_b)
 
+            prod_a_display = res_a['product_name'] or t('Produk A', 'Product A')
+            prod_b_display = res_b['product_name'] or t('Produk B', 'Product B')
+
             if score_a < score_b:
-                st.success(f"Berdasarkan analisis nutrisi, **{res_a['product_name'] or 'Produk A'}** adalah pilihan yang lebih baik. Skor risikonya **{diff:.2f}% lebih rendah** dibandingkan {res_b['product_name'] or 'Produk B'}.")
+                st.success(t(f"Berdasarkan analisis nutrisi, **{prod_a_display}** adalah pilihan yang lebih baik. Skor risikonya **{diff:.2f}% lebih rendah** dibandingkan {prod_b_display}.", f"Based on nutritional analysis, **{prod_a_display}** is the better choice. Its risk score is **{diff:.2f}% lower** than {prod_b_display}."))
             elif score_b < score_a:
-                st.success(f"Berdasarkan analisis nutrisi, **{res_b['product_name'] or 'Produk B'}** adalah pilihan yang lebih baik. Skor risikonya **{diff:.2f}% lebih rendah** dibandingkan {res_a['product_name'] or 'Produk A'}.")
+                st.success(t(f"Berdasarkan analisis nutrisi, **{prod_b_display}** adalah pilihan yang lebih baik. Skor risikonya **{diff:.2f}% lebih rendah** dibandingkan {prod_a_display}.", f"Based on nutritional analysis, **{prod_b_display}** is the better choice. Its risk score is **{diff:.2f}% lower** than {prod_a_display}."))
             else:
-                st.info("Kedua produk memiliki metrik tingkat risiko yang identik secara numerik.")
+                st.info(t("Kedua produk memiliki metrik tingkat risiko yang identik secara numerik.", "Both products have numerically identical risk level metrics."))
 
             fig_comp = go.Figure(data=[
-                go.Bar(name=res_a['product_name'] or 'Produk A', x=['Skor Risiko AI (%)'], y=[score_a], marker_color='#3498DB', text=[f"{score_a:.1f}%"], textposition='auto'),
-                go.Bar(name=res_b['product_name'] or 'Produk B', x=['Skor Risiko AI (%)'], y=[score_b], marker_color='#E74C3C', text=[f"{score_b:.1f}%"], textposition='auto')
+                go.Bar(name=prod_a_display, x=[t('Skor Risiko AI (%)', 'AI Risk Score (%)')], y=[score_a], marker_color='#3498DB', text=[f"{score_a:.1f}%"], textposition='auto'),
+                go.Bar(name=prod_b_display, x=[t('Skor Risiko AI (%)', 'AI Risk Score (%)')], y=[score_b], marker_color='#E74C3C', text=[f"{score_b:.1f}%"], textposition='auto')
             ])
-            fig_comp.update_layout(barmode='group', title="Perbandingan Head-to-Head Skor Risiko", height=400)
+            fig_comp.update_layout(barmode='group', title=t("Perbandingan Head-to-Head Skor Risiko", "Head-to-Head Risk Score Comparison"), height=400)
             st.plotly_chart(fig_comp, use_container_width=True)
 
             st.markdown("---")
 
         row1_colA, row1_colB = st.columns(2, gap="large")
         with row1_colA:
-            st.markdown(f"### Hasil: {res_a['product_name'] or 'Produk A'}")
-            st.markdown("#### Profil & Analisis Produk Dasar")
-            st.caption("Ringkasan prediksi risiko dan kontribusi nutrisi utama.")
+            st.markdown(f"### {t('Hasil:', 'Result:')} {res_a['product_name'] or t('Produk A', 'Product A')}")
+            st.markdown(t("#### Profil & Analisis Produk Dasar", "#### Basic Product Profile & Analysis"))
+            st.caption(t("Ringkasan prediksi risiko dan kontribusi nutrisi utama.", "Summary of predicted risk and main nutritional contributions."))
             render_analysis_side(res_a)
         with row1_colB:
-            st.markdown(f"### Hasil: {res_b['product_name'] or 'Produk B'}")
-            st.markdown("#### Profil & Analisis Produk Dasar")
-            st.caption("Ringkasan prediksi risiko dan kontribusi nutrisi utama.")
+            st.markdown(f"### {t('Hasil:', 'Result:')} {res_b['product_name'] or t('Produk B', 'Product B')}")
+            st.markdown(t("#### Profil & Analisis Produk Dasar", "#### Basic Product Profile & Analysis"))
+            st.caption(t("Ringkasan prediksi risiko dan kontribusi nutrisi utama.", "Summary of predicted risk and main nutritional contributions."))
             render_analysis_side(res_b)
 
         if res_a.get("status") == "ok" and res_b.get("status") == "ok":
@@ -1662,8 +1754,8 @@ elif app_mode == "Perbandingan Produk":
                 
             st.markdown("---")
             
-            st.markdown("### 📊 Profil Gizi & Makronutrien Holistik")
-            st.caption("Analisis mendalam mengenai sumber kalori dan dampak glikemik berdasarkan takaran saji.")
+            st.markdown(t("### 📊 Profil Gizi & Makronutrien Holistik", "### 📊 Holistic Nutrition & Macronutrient Profile"))
+            st.caption(t("Analisis mendalam mengenai sumber kalori dan dampak glikemik berdasarkan takaran saji.", "In-depth analysis of calorie sources and glycemic impact based on serving size."))
             
             row3a_colA, row3a_colB = st.columns(2, gap="large")
             with row3a_colA:
@@ -1672,7 +1764,7 @@ elif app_mode == "Perbandingan Produk":
                 render_nutrition_kepadatan_gula(res_b["nutrition_data"], res_b["takaran_saji"])
 
             st.write("")
-            st.markdown("**Distribusi Sumber Kalori (Macronutrient Split)**")
+            st.markdown(t("**Distribusi Sumber Kalori (Macronutrient Split)**", "**Calorie Source Distribution (Macronutrient Split)**"))
             
             row3b_colA, row3b_colB = st.columns(2, gap="large")
             with row3b_colA:
@@ -1689,9 +1781,12 @@ elif app_mode == "Perbandingan Produk":
                 render_health_metrics(res_b["nutrition_data"], res_b["takaran_saji"], current_threshold, show_header=True)
 
 
-elif app_mode == "Simulasi Konsumsi Produk":
-    st.header("Simulasi Konsumsi Produk")
-    st.info("Masukkan detail produk dan perkirakan dampak risikonya berdasarkan frekuensi konsumsi Anda.")
+elif app_mode in ["Simulasi Konsumsi Produk", "Consumption Simulation"]:
+    st.header(t("Simulasi Konsumsi Produk", "Product Consumption Simulation"))
+    st.info(t(
+        "Masukkan detail produk dan perkirakan dampak risikonya berdasarkan frekuensi konsumsi Anda.",
+        "Input product details and estimate its risk impact based on your consumption frequency."
+    ))
 
     if "sim_data" not in st.session_state:
         st.session_state.sim_data = init_parsed_data()
@@ -1702,22 +1797,23 @@ elif app_mode == "Simulasi Konsumsi Produk":
         st.session_state.sim_data = dict(EXAMPLE_PRESETS[st.session_state.preset_sim])
         st.session_state.sim_ver += 1
 
-    st.markdown("### Langkah 1: Definisikan Produk")
-    method_sim = st.radio("Metode Input Produk:", ["Pilih Contoh Produk", "Scan Label (OCR)", "Input Manual"], horizontal=True, key="method_sim")
+    st.markdown(t("### Langkah 1: Definisikan Produk", "### Step 1: Define Product"))
+    method_options = [t("Pilih Contoh Produk", "Choose Example"), t("Scan Label (OCR)", "Scan Label (OCR)"), t("Input Manual", "Manual Input")]
+    method_sim = st.radio(t("Metode Input Produk:", "Product Input Method:"), method_options, horizontal=True, key="method_sim")
     
-    if method_sim == "Pilih Contoh Produk":
-        st.selectbox("Contoh Uji Produk", list(EXAMPLE_PRESETS.keys()), key="preset_sim", on_change=apply_sim_preset)
-    elif method_sim == "Scan Label (OCR)":
+    if method_sim in ["Pilih Contoh Produk", "Choose Example"]:
+        st.selectbox(t("Contoh Uji Produk", "Example Test Product"), list(EXAMPLE_PRESETS.keys()), key="preset_sim", format_func=lambda x: t(x, EN_PRESET_NAMES.get(x, x)), on_change=apply_sim_preset)
+    elif method_sim in ["Scan Label (OCR)", "Scan Label (OCR)"]:
         col_scan_gizi_sim, col_scan_komp_sim = st.columns(2)
         with col_scan_gizi_sim:
-            st.markdown("**1. Scan Nilai Gizi**")
-            type_sim_gizi = st.radio("S. Gizi Sim", ["Upload", "Kamera"], key="type_sim_gizi", horizontal=True, label_visibility="collapsed")
-            file_sim_gizi = st.file_uploader("Foto Gizi Sim", type=["jpg", "jpeg", "png"], key="file_sim_gizi") if type_sim_gizi == "Upload" else st.camera_input("Kamera Gizi Sim", key="cam_sim_gizi")
+            st.markdown(t("**1. Scan Nilai Gizi**", "**1. Scan Nutrition**"))
+            type_sim_gizi = st.radio("S. Gizi Sim", [t("Upload", "Upload"), t("Kamera", "Camera")], key="type_sim_gizi", horizontal=True, label_visibility="collapsed")
+            file_sim_gizi = st.file_uploader(t("Foto Gizi Sim", "Nutrition Photo Sim"), type=["jpg", "jpeg", "png"], key="file_sim_gizi") if type_sim_gizi in ["Upload"] else st.camera_input(t("Kamera Gizi Sim", "Nutrition Camera Sim"), key="cam_sim_gizi")
             if file_sim_gizi:
                 img_sim_gizi = Image.open(file_sim_gizi)
-                safe_image(standardize_image_size(img_sim_gizi), caption="Gizi Sim", width=250)
+                safe_image(standardize_image_size(img_sim_gizi), caption=t("Gizi Sim", "Nutrition Sim"), width=250)
                 if st.button("🔍 OCR Gizi", key="btn_ocr_sim_gizi"):
-                    with st.spinner("Membaca..."):
+                    with st.spinner(t("Membaca...", "Reading...")):
                         reader, err = get_ocr_reader_safely()
                         if err: st.error(err)
                         else:
@@ -1727,18 +1823,18 @@ elif app_mode == "Simulasi Konsumsi Produk":
                                 for k, v in res["parsed"].items():
                                     if v not in [0, 0.0, "Tidak terdeteksi.", "", "Produk Tanpa Nama"]:
                                         st.session_state.sim_data[k] = v
-                                st.session_state.sim_ver += 1
-                                st.success("Tersimpan!")
+                            st.session_state.sim_ver += 1
+                            st.success(t("Tersimpan!", "Saved!"))
 
         with col_scan_komp_sim:
-            st.markdown("**2. Scan Komposisi**")
-            type_sim_komp = st.radio("S. Komp Sim", ["Upload", "Kamera"], key="type_sim_komp", horizontal=True, label_visibility="collapsed")
-            file_sim_komp = st.file_uploader("Foto Komp Sim", type=["jpg", "jpeg", "png"], key="file_sim_komp") if type_sim_komp == "Upload" else st.camera_input("Kamera Komp Sim", key="cam_sim_komp")
+            st.markdown(t("**2. Scan Komposisi**", "**2. Scan Composition**"))
+            type_sim_komp = st.radio("S. Komp Sim", [t("Upload", "Upload"), t("Kamera", "Camera")], key="type_sim_komp", horizontal=True, label_visibility="collapsed")
+            file_sim_komp = st.file_uploader(t("Foto Komp Sim", "Composition Photo Sim"), type=["jpg", "jpeg", "png"], key="file_sim_komp") if type_sim_komp in ["Upload"] else st.camera_input(t("Kamera Komp Sim", "Composition Camera Sim"), key="cam_sim_komp")
             if file_sim_komp:
                 img_sim_komp = Image.open(file_sim_komp)
-                safe_image(standardize_image_size(img_sim_komp), caption="Komp Sim", width=250)
+                safe_image(standardize_image_size(img_sim_komp), caption=t("Komp Sim", "Comp Sim"), width=250)
                 if st.button("🔍 OCR Komposisi", key="btn_ocr_sim_komp"):
-                    with st.spinner("Membaca..."):
+                    with st.spinner(t("Membaca...", "Reading...")):
                         reader, err = get_ocr_reader_safely()
                         if err: st.error(err)
                         else:
@@ -1748,23 +1844,23 @@ elif app_mode == "Simulasi Konsumsi Produk":
                                 val = res["parsed"].get("komposisi", "")
                                 if val and val != "Tidak terdeteksi.":
                                     st.session_state.sim_data["komposisi"] = val
-                                st.session_state.sim_ver += 1
-                                st.success("Tersimpan!")
+                            st.session_state.sim_ver += 1
+                            st.success(t("Tersimpan!", "Saved!"))
 
     prod_name_sim, saji_sim, nut_sim, kompo_sim = input_form(f"sim_{st.session_state.sim_ver}", st.session_state.sim_data)
 
     st.markdown("---")
-    st.markdown("### Langkah 2: Atur Pola Konsumsi")
+    st.markdown(t("### Langkah 2: Atur Pola Konsumsi", "### Step 2: Set Consumption Pattern"))
     col_pola1, col_pola2 = st.columns(2)
-    freq_weekly = col_pola1.slider("Frekuensi konsumsi per minggu (kali/sajian)", 1, 21, 3)
-    sim_period = col_pola2.slider("Periode Simulasi (Bulan)", 1, 12, 1)
+    freq_weekly = col_pola1.slider(t("Frekuensi konsumsi per minggu (kali/sajian)", "Consumption frequency per week (times/servings)"), 1, 21, 3)
+    sim_period = col_pola2.slider(t("Periode Simulasi (Bulan)", "Simulation Period (Months)"), 1, 12, 1)
 
-    if st.button("🚀 Jalankan Simulasi", type="primary", use_container_width=True):
+    if st.button(t("🚀 Jalankan Simulasi", "🚀 Run Simulation"), type="primary", use_container_width=True):
         res_sim = build_analysis_result(prod_name_sim, saji_sim, nut_sim, kompo_sim)
         
         if res_sim.get("status") == "ok":
             st.markdown("---")
-            st.markdown("### 📈 Hasil Simulasi")
+            st.markdown(t("### 📈 Hasil Simulasi", "### 📈 Simulation Results"))
             
             total_days = sim_period * 30
             total_weeks = total_days / 7
@@ -1780,32 +1876,35 @@ elif app_mode == "Simulasi Konsumsi Produk":
             max_sat_fat = current_threshold["lemak_jenuh"] * total_days
             max_cal = current_threshold["kalori"] * total_days
 
-            st.markdown(f"#### Dampak Akumulatif Selama {sim_period} Bulan (~{total_days} hari)")
+            st.markdown(t(f"#### Dampak Akumulatif Selama {sim_period} Bulan (~{total_days} hari)", f"#### Cumulative Impact Over {sim_period} Month(s) (~{total_days} days)"))
             c1, c2, c3 = st.columns(3)
-            c1.metric("Total Sajian Dikonsumsi", f"{int(total_servings)} porsi", f"{freq_weekly}x seminggu")
-            c2.metric("Total Gula dari Produk", f"{acc_sugar:.1f} g", f"Setara ~ {acc_sugar/15:.1f} sdm gula")
-            c3.metric("Total Kalori dari Produk", f"{acc_cal:.1f} kkal", f"Setara ~ {acc_cal/7700:.1f} kg lemak")
+            c1.metric(t("Total Sajian Dikonsumsi", "Total Servings Consumed"), f"{int(total_servings)} {t('porsi','servings')}", f"{freq_weekly}x {t('seminggu','a week')}")
+            c2.metric(t("Total Gula dari Produk", "Total Sugar from Product"), f"{acc_sugar:.1f} g", t(f"Setara ~ {acc_sugar/15:.1f} sdm gula", f"Equals ~ {acc_sugar/15:.1f} tbsp sugar"))
+            c3.metric(t("Total Kalori dari Produk", "Total Calories from Product"), f"{acc_cal:.1f} kkal", t(f"Setara ~ {acc_cal/7700:.1f} kg lemak", f"Equals ~ {acc_cal/7700:.1f} kg fat"))
 
             st.write("")
-            st.markdown("##### ⚠️ Persentase Konsumsi Terhadap Batas Maksimal (Angka Kecukupan Gizi) Anda dalam Periode Ini:")
+            st.markdown(t("##### ⚠️ Persentase Konsumsi Terhadap Batas Maksimal (Angka Kecukupan Gizi) Anda dalam Periode Ini:", "##### ⚠️ Consumption Percentage Against Your Maximum Limit (RDA) in This Period:"))
             
             gula_pct = (acc_sugar / max_sugar * 100) if max_sugar else 0
             natrium_pct = (acc_sodium / max_sodium * 100) if max_sodium else 0
             lemak_jenuh_pct = (acc_sat_fat / max_sat_fat * 100) if max_sat_fat else 0
             kalori_pct = (acc_cal / max_cal * 100) if max_cal else 0
 
-            custom_progress_bar("Kalori yang Dihabiskan", acc_cal, max_cal, "kkal", "#10B981", kalori_pct)
-            custom_progress_bar("Batas Gula yang Dihabiskan", acc_sugar, max_sugar, "g", "#F59E0B", gula_pct)
-            custom_progress_bar("Batas Natrium yang Dihabiskan", acc_sodium, max_sodium, "mg", "#3498DB", natrium_pct)
-            custom_progress_bar("Batas Lemak Jenuh yang Dihabiskan", acc_sat_fat, max_sat_fat, "g", "#9B59B6", lemak_jenuh_pct)
+            custom_progress_bar(t("Kalori yang Dihabiskan", "Calories Consumed"), acc_cal, max_cal, "kkal", "#10B981", kalori_pct)
+            custom_progress_bar(t("Batas Gula yang Dihabiskan", "Sugar Limit Consumed"), acc_sugar, max_sugar, "g", "#F59E0B", gula_pct)
+            custom_progress_bar(t("Batas Natrium yang Dihabiskan", "Sodium Limit Consumed"), acc_sodium, max_sodium, "mg", "#3498DB", natrium_pct)
+            custom_progress_bar(t("Batas Lemak Jenuh yang Dihabiskan", "Saturated Fat Limit Consumed"), acc_sat_fat, max_sat_fat, "g", "#9B59B6", lemak_jenuh_pct)
             
-            st.info("Simulasi di atas menunjukkan seberapa besar jatah nutrisi Anda yang **habis hanya oleh satu jenis produk ini saja** selama periode simulasi. Idealnya, camilan atau minuman tunggal tidak boleh mendominasi batas asupan harian/bulanan Anda.")
+            st.info(t(
+                "Simulasi di atas menunjukkan seberapa besar jatah nutrisi Anda yang **habis hanya oleh satu jenis produk ini saja** selama periode simulasi. Idealnya, camilan atau minuman tunggal tidak boleh mendominasi batas asupan harian/bulanan Anda.",
+                "The simulation above shows how much of your nutrient allowance is **consumed solely by this one product type** over the simulation period. Ideally, a single snack or beverage should not dominate your daily/monthly limits."
+            ))
             
             st.markdown("---")
             col_simA, col_simB = st.columns(2, gap="large")
             with col_simA:
-                st.markdown("### 📋 Profil & Analisis Produk Dasar")
-                st.caption("Ringkasan prediksi risiko dan kontribusi nutrisi utama.")
+                st.markdown(t("### 📋 Profil & Analisis Produk Dasar", "### 📋 Basic Product Profile & Analysis"))
+                st.caption(t("Ringkasan prediksi risiko dan kontribusi nutrisi utama.", "Summary of predicted risk and main nutritional contributions."))
                 render_analysis_side(res_sim)
             with col_simB:
                 render_holistic_nutrition_profile(res_sim["nutrition_data"], res_sim["takaran_saji"])
@@ -1817,17 +1916,16 @@ elif app_mode == "Simulasi Konsumsi Produk":
             st.markdown("---")
             render_health_metrics(res_sim["nutrition_data"], res_sim["takaran_saji"], current_threshold, show_header=True)
         else:
-            st.error("Silakan lengkapi data nutrisi produk untuk menjalankan simulasi.")
+            st.error(t("Silakan lengkapi data nutrisi produk untuk menjalankan simulasi.", "Please complete product nutrition data to run simulation."))
 
 
-# --- Update Bagian Riwayat Analisis ---
-elif app_mode == "Riwayat Analisis":
-    st.header("Riwayat Analisis")
-    st.write("Daftar lengkap riwayat analisis produk yang dilakukan pada sesi ini.")
+elif app_mode in ["Riwayat Analisis", "Analysis History"]:
+    st.header(t("Riwayat Analisis", "Analysis History"))
+    st.write(t("Daftar lengkap riwayat analisis produk yang dilakukan pada sesi ini.", "Complete list of product analysis history performed in this session."))
     
-    if st.button("🗑️ Hapus Riwayat"):
+    if st.button(t("🗑️ Hapus Riwayat", "🗑️ Clear History")):
         st.session_state.scan_history = []
-        st.success("Riwayat berhasil dihapus!")
+        st.success(t("Riwayat berhasil dihapus!", "History successfully cleared!"))
 
     if st.session_state.scan_history:
         valid_history = []
@@ -1864,17 +1962,41 @@ elif app_mode == "Riwayat Analisis":
         
         if valid_history:
             df_hist = pd.DataFrame(valid_history)
-            st.dataframe(df_hist, use_container_width=True)
+
+            # Display translated dataframe based on language
+            df_disp_hist = df_hist.copy()
+            if st.session_state.lang == "EN":
+                df_disp_hist.rename(columns={
+                    "Waktu Analisis": "Analysis Time",
+                    "Nama Produk": "Product Name",
+                    "Skor Risiko (%)": "Risk Score (%)",
+                    "Klasifikasi": "Classification",
+                    "Takaran Saji (g/ml)": "Serving Size (g/ml)",
+                    "Energi (kkal)": "Energy (kcal)",
+                    "Lemak Total (g)": "Total Fat (g)",
+                    "Lemak Jenuh (g)": "Saturated Fat (g)",
+                    "Protein (g)": "Protein (g)",
+                    "Karbohidrat (g)": "Carbohydrate (g)",
+                    "Gula (g)": "Sugar (g)",
+                    "Garam (g)": "Salt (g)",
+                    "Natrium (mg)": "Sodium (mg)",
+                    "Natrium Benzoat (mg)": "Sodium Benzoate (mg)",
+                    "Komposisi": "Composition",
+                    "Rekomendasi": "Recommendation"
+                }, inplace=True)
+                df_disp_hist["Classification"] = df_disp_hist["Classification"].apply(tr_risk)
+
+            st.dataframe(df_disp_hist, use_container_width=True)
             
             st.markdown("---")
             output_hist = io.BytesIO()
             with pd.ExcelWriter(output_hist, engine="openpyxl") as writer:
-                df_hist.to_excel(writer, index=False, sheet_name="Riwayat Analisis")
+                df_disp_hist.to_excel(writer, index=False, sheet_name=t("Riwayat Analisis", "Analysis History"))
             
             col_dl1, col_dl2 = st.columns(2)
             with col_dl1:
                 st.download_button(
-                    label="📊 Download Riwayat (Excel)", 
+                    label=t("📊 Download Riwayat (Excel)", "📊 Download History (Excel)"), 
                     data=output_hist.getvalue(), 
                     file_name="riwayat_analisis_nutriscan.xlsx",
                     use_container_width=True
@@ -1888,26 +2010,26 @@ elif app_mode == "Riwayat Analisis":
                     pdf_ready = False
                 
                 if pdf_ready:
-                    with st.spinner("Menyiapkan dokumen PDF..."):
+                    with st.spinner(t("Menyiapkan dokumen PDF...", "Preparing PDF document...")):
                         pdf_hist_data = generate_history_pdf_report(df_hist)
                         st.download_button(
-                            label="📑 Download Riwayat (PDF)", 
+                            label=t("📑 Download Riwayat (PDF)", "📑 Download History (PDF)"), 
                             data=pdf_hist_data, 
                             file_name="Riwayat_Analisis_NutriScan.pdf", 
                             mime="application/pdf",
                             use_container_width=True
                         )
                 else:
-                    st.warning("⚠️ Modul 'fpdf' belum terinstall. Jalankan `pip install fpdf` di terminal.")
+                    st.warning(t("⚠️ Modul 'fpdf' belum terinstall. Jalankan `pip install fpdf` di terminal.", "⚠️ Module 'fpdf' not installed. Run `pip install fpdf`."))
         else:
-            st.info("Belum ada riwayat analisis pada sesi ini.")
+            st.info(t("Belum ada riwayat analisis pada sesi ini.", "No analysis history in this session yet."))
     else:
-        st.info("Belum ada riwayat analisis pada sesi ini.")
+        st.info(t("Belum ada riwayat analisis pada sesi ini.", "No analysis history in this session yet."))
 
 
-elif app_mode == "Edukasi Gizi":
-    st.header("Edukasi Gizi")
-    st.markdown(
+elif app_mode in ["Edukasi Gizi", "Nutrition Education"]:
+    st.header(t("Edukasi Gizi", "Nutrition Education"))
+    st.markdown(t(
         """
         **Cara membaca hasil aplikasi:**
 
@@ -1918,5 +2040,16 @@ elif app_mode == "Edukasi Gizi":
         5. Natrium tinggi perlu dibatasi, terutama pada pengguna dengan risiko hipertensi.
         6. Lemak jenuh tinggi sebaiknya tidak dikonsumsi terlalu sering.
         7. Komposisi dengan pemanis buatan, pewarna sintetik, pengawet, dan penguat rasa menandakan indikasi produk ultra proses.
+        """,
         """
-    )
+        **How to read the application results:**
+
+        1. OCR only helps fill in initial data, it is not a substitute for user validation.
+        2. Empty data is not analyzed so the application doesn't provide false classifications.
+        3. Safe, Moderate, and High classifications use a single decision function.
+        4. High sugar must be monitored as it affects the daily intake load.
+        5. High sodium needs to be limited, especially for users at risk for hypertension.
+        6. High saturated fat should not be consumed too frequently.
+        7. Composition with artificial sweeteners, synthetic colors, preservatives, and flavor enhancers indicates an ultra-processed product.
+        """
+    ))
