@@ -1390,6 +1390,26 @@ elif app_mode in ["Analisis Batch Excel", "Batch Excel Analysis"]:
                         "nutrition_data": nutrition_data,
                         "takaran_saji": takaran_saji
                     })
+
+                    # --- SIMPAN KE HISTORY ---
+                    st.session_state.scan_history.append({
+                        "Waktu Analisis": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "Nama Produk": product_name,
+                        "Skor Risiko (%)": round(risk_score, 2),
+                        "Klasifikasi": risk_info["label"],
+                        "Takaran Saji (g/ml)": takaran_saji,
+                        "Energi (kkal)": nutrition_data.get("energi", 0),
+                        "Lemak Total (g)": nutrition_data.get("lemak_total", 0),
+                        "Lemak Jenuh (g)": nutrition_data.get("lemak_jenuh", 0),
+                        "Protein (g)": nutrition_data.get("protein", 0),
+                        "Karbohidrat (g)": nutrition_data.get("karbohidrat", 0),
+                        "Gula (g)": nutrition_data.get("gula", 0),
+                        "Garam (g)": nutrition_data.get("garam", 0),
+                        "Natrium (mg)": nutrition_data.get("natrium", 0),
+                        "Natrium Benzoat (mg)": nutrition_data.get("natrium_benzoat", 0),
+                        "Komposisi": komposisi,
+                        "Rekomendasi": recommendation
+                    })
                 
                 counter += 1
                 progress_bar.progress(counter / total_rows)
@@ -1823,8 +1843,8 @@ elif app_mode in ["Simulasi Konsumsi Produk", "Consumption Simulation"]:
                                 for k, v in res["parsed"].items():
                                     if v not in [0, 0.0, "Tidak terdeteksi.", "", "Produk Tanpa Nama"]:
                                         st.session_state.sim_data[k] = v
-                            st.session_state.sim_ver += 1
-                            st.success(t("Tersimpan!", "Saved!"))
+                        st.session_state.sim_ver += 1
+                        st.success(t("Tersimpan!", "Saved!"))
 
         with col_scan_komp_sim:
             st.markdown(t("**2. Scan Komposisi**", "**2. Scan Composition**"))
@@ -1844,8 +1864,8 @@ elif app_mode in ["Simulasi Konsumsi Produk", "Consumption Simulation"]:
                                 val = res["parsed"].get("komposisi", "")
                                 if val and val != "Tidak terdeteksi.":
                                     st.session_state.sim_data["komposisi"] = val
-                            st.session_state.sim_ver += 1
-                            st.success(t("Tersimpan!", "Saved!"))
+                        st.session_state.sim_ver += 1
+                        st.success(t("Tersimpan!", "Saved!"))
 
     prod_name_sim, saji_sim, nut_sim, kompo_sim = input_form(f"sim_{st.session_state.sim_ver}", st.session_state.sim_data)
 
