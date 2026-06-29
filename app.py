@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 import re
 import tempfile
@@ -45,8 +46,39 @@ def tr_risk(label):
     return mapping.get(label, label)
 
 
+# --- PERSISTENCE HELPER (MENYIMPAN RIWAYAT PERMANEN) ---
+HISTORY_FILE = "scan_history.json"
+
+def load_history():
+    """Memuat riwayat dari file JSON lokal saat aplikasi dimulai."""
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def save_history(history_list):
+    """Menyimpan riwayat terbaru ke file JSON lokal."""
+    try:
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history_list, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        st.error(f"Gagal menyimpan riwayat permanen: {e}")
+
+def clear_history_file():
+    """Menghapus file JSON riwayat secara permanen."""
+    if os.path.exists(HISTORY_FILE):
+        try:
+            os.remove(HISTORY_FILE)
+        except Exception:
+            pass
+
+
+# Inisialisasi Session State dengan memuat data dari file lokal
 if "scan_history" not in st.session_state:
-    st.session_state.scan_history = []
+    st.session_state.scan_history = load_history()
 
 if "batch_result_df" not in st.session_state:
     st.session_state.batch_result_df = None
@@ -971,6 +1003,8 @@ def store_product_analysis_result(product_name, takaran_saji, nutrition_data, ko
             "Komposisi": komposisi,
             "Rekomendasi": analysis_result.get("recommendation", "")
         })
+        # Simpan ke file lokal setiap ada perubahan
+        save_history(st.session_state.scan_history)
 
     return analysis_result
 
@@ -1414,6 +1448,9 @@ elif app_mode in ["Analisis Batch Excel", "Batch Excel Analysis"]:
                 counter += 1
                 progress_bar.progress(counter / total_rows)
             
+            # Simpan seluruh history baru ke file lokal setelah batch selesai
+            save_history(st.session_state.scan_history)
+
             st.session_state.batch_result_df = pd.DataFrame(results)
             st.session_state.batch_total_rows = total_rows
             
@@ -1945,6 +1982,7 @@ elif app_mode in ["Riwayat Analisis", "Analysis History"]:
     
     if st.button(t("🗑️ Hapus Riwayat", "🗑️ Clear History")):
         st.session_state.scan_history = []
+        clear_history_file()
         st.success(t("Riwayat berhasil dihapus!", "History successfully cleared!"))
 
     if st.session_state.scan_history:
